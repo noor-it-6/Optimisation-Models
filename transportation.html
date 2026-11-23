@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Grand Prix Transportation Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  /* Layout: a sticky stage bar over one column of numbered stages; presenter mode shows one stage at a time, large. */
+  --bg: #f4f5f6;
+  --surface: #ffffff;
+  --ink: #18212b;
+  --muted: #5a6570;
+  --line: #d8dde2;
+  --accent: #c9352a;      /* tomato red: plants and product flow */
+  --accent-soft: #f7e3e0;
+  --cap: #b77900;         /* semantic: arc at capacity */
+  --cap-soft: #fbefd6;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161b; --surface: #192027; --ink: #e6eaee; --muted: #9ba6b1; --line: #2d3640;
+    --accent: #ff6b57; --accent-soft: #3a211e; --cap: #f0b43a; --cap-soft: #3a2f17;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161b; --surface: #192027; --ink: #e6eaee; --muted: #9ba6b1; --line: #2d3640;
+  --accent: #ff6b57; --accent-soft: #3a211e; --cap: #f0b43a; --cap-soft: #3a2f17;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.55; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.015em; }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Top bar */
+.bar { position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar-inner { max-width: 1180px; margin: 0 auto; padding: 10px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
+.bar h1 span { color: var(--accent); }
+.stages { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto; }
+.stages button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 3px 11px; font-size: 0.82rem; cursor: pointer; color: var(--muted); }
+.stages button:hover { color: var(--ink); border-color: var(--muted); }
+.stages button[aria-current="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.mode { display: inline-flex; border: 1px solid var(--ink); border-radius: 8px; overflow: hidden; }
+.mode button { border: 0; background: transparent; padding: 5px 13px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
+.mode button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+main { max-width: 1180px; margin: 0 auto; padding: 24px 20px 80px; display: flex; flex-direction: column; gap: 28px; }
+.stage { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 20px; scroll-margin-top: 90px; }
+.stage-head { display: flex; align-items: baseline; gap: 14px; }
+.stage-no { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); font-weight: 500; }
+.lede { font-size: 1.08rem; color: var(--muted); }
+.cols { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+
+/* Study-only material */
+.note { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; display: flex; flex-direction: column; gap: 6px; }
+.note h3 { font-size: 0.95rem; }
+details.q { border: 1px dashed var(--muted); border-radius: 8px; padding: 10px 14px; }
+details.q summary { cursor: pointer; font-weight: 600; }
+details.q summary::marker { color: var(--accent); }
+details.q[open] summary { margin-bottom: 8px; }
+.tag { display: inline-block; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); }
+
+/* Data tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tile { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.tile .k { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.tile .v { font-family: var(--mono); font-size: 1.35rem; font-weight: 500; }
+.tile .s { font-size: 0.85rem; color: var(--muted); }
+.tile.hot { border-color: var(--accent); }
+.tile.hot .v { color: var(--accent); }
+
+/* Network */
+.net-wrap { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow-x: auto; }
+svg.net { display: block; width: 100%; min-width: 560px; height: auto; }
+.arc { fill: none; stroke: var(--line); stroke-width: 1.6; }
+.arc.used { stroke: var(--accent); }
+.arc.cap { stroke: var(--cap); }
+.arc.hl { stroke: var(--ink); stroke-width: 4; }
+.arc.dim { opacity: 0.18; }
+.mk-faint { fill: var(--line); } .mk-used { fill: var(--accent); } .mk-cap { fill: var(--cap); } .mk-hl { fill: var(--ink); }
+.lbl rect { fill: var(--surface); stroke: currentColor; stroke-width: 1.2; }
+.lbl text { font-family: var(--mono); font-size: 15px; font-weight: 500; fill: var(--ink); }
+.lbl.used { color: var(--accent); } .lbl.cap { color: var(--cap); } .lbl.dim { opacity: 0.2; }
+.node-plant { fill: var(--accent); }
+.node-wh { fill: var(--surface); stroke: var(--ink); stroke-width: 2.5; }
+.node-cust { fill: var(--ink); }
+.node-num { font-family: var(--display); font-weight: 800; font-size: 22px; text-anchor: middle; dominant-baseline: central; }
+.node-num.on-plant { fill: #fff; } .node-num.on-wh { fill: var(--ink); } .node-num.on-cust { fill: var(--bg); }
+.cap1 { font-family: var(--body); font-size: 16px; font-weight: 600; fill: var(--ink); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.cap2 { font-family: var(--mono); font-size: 14px; fill: var(--muted); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.85rem; color: var(--muted); padding: 8px 14px; border-top: 1px solid var(--line); }
+.legend i { display: inline-block; width: 22px; height: 0; border-top: 4px solid; vertical-align: middle; margin-right: 6px; }
+.legend .sw { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin-right: 6px; }
+
+/* Tables */
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { padding: 6px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+td.r, th.r { text-align: right; }
+table.matrix td, table.matrix th { text-align: center; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+table.matrix td.has { cursor: pointer; }
+table.matrix td.has:hover, table.matrix td.has.on { background: var(--ink); color: var(--bg); }
+table.matrix td.none { color: var(--line); }
+table.matrix th[scope="row"] { color: var(--ink); }
+.grp { font-size: 0.7rem; color: var(--muted); display: block; font-family: var(--body); font-weight: 400; letter-spacing: 0; text-transform: none; }
+tr.total td { font-weight: 600; border-top: 2px solid var(--ink); border-bottom: 0; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; overflow-wrap: anywhere; }
+
+/* Maths */
+.math { font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif; font-size: 1.12rem; }
+.math i { font-style: italic; }
+.eqs { display: flex; flex-direction: column; gap: 14px; }
+.eq { display: grid; grid-template-columns: 170px 1fr; gap: 6px 18px; align-items: baseline; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.eq:last-child { border-bottom: 0; }
+.eq .name { font-weight: 600; font-size: 0.92rem; }
+.eq .name small { display: block; font-weight: 400; color: var(--muted); }
+.eq .body { display: flex; flex-direction: column; gap: 4px; }
+.eq .ex { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); }
+.net-term { background: var(--accent-soft); border-radius: 4px; padding: 0 4px; }
+.sigma { font-size: 1.3em; vertical-align: -0.12em; }
+
+/* Controls */
+.ctrl { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.ctrl label { font-weight: 600; display: flex; justify-content: space-between; gap: 10px; }
+.ctrl output { font-family: var(--mono); color: var(--accent); font-weight: 500; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.ticks { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--ink); background: transparent; border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 0.88rem; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.chart { border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.chart svg { display: block; width: 100%; height: auto; }
+.ch-axis { stroke: var(--muted); stroke-width: 1; }
+.ch-grid { stroke: var(--line); stroke-width: 1; }
+.ch-line { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+.ch-area { fill: var(--accent-soft); }
+.ch-dot { fill: var(--accent); stroke: var(--surface); stroke-width: 3; }
+.ch-txt { font-family: var(--mono); font-size: 12px; fill: var(--muted); }
+.ch-ttl { font-family: var(--body); font-size: 12px; fill: var(--muted); font-weight: 600; }
+.ch-cur { font-family: var(--mono); font-size: 13px; fill: var(--ink); font-weight: 500; }
+.insights { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.solver-box { font-family: var(--mono); font-size: 0.84rem; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.solver-box b { font-family: var(--body); }
+
+/* Article-style formulation */
+.model { display: flex; flex-direction: column; gap: 2px; }
+.model.boxed { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+.mlabel { font-weight: 700; margin: 10px 0 2px; }
+.mlabel:first-child { margin-top: 0; }
+.mrow { display: grid; grid-template-columns: minmax(0, 1fr) 3.2em; align-items: center; gap: 8px; }
+.mx { overflow-x: auto; overflow-y: hidden; }
+.mx mjx-container[display="true"] { margin: 0.35em 0 !important; }
+.mno { text-align: right; font-variant-numeric: tabular-nums; }
+.ex { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); }
+table.notation { font-size: 0.9rem; }
+table.notation caption { caption-side: top; text-align: left; padding-bottom: 6px; font-size: 0.9rem; }
+table.notation thead th { border-top: 2px solid var(--ink); border-bottom: 1px solid var(--ink); text-transform: none; letter-spacing: 0; font-size: 0.85rem; color: var(--ink); }
+table.notation th[scope="rowgroup"] { font-weight: 400; color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 0.9rem; white-space: nowrap; vertical-align: top; }
+table.notation td { border-bottom: 0; padding: 3px 9px; }
+table.notation td:last-child { font-style: italic; }
+table.notation tr.grp-start > * { border-top: 1px solid var(--line); padding-top: 8px; }
+table.notation tbody tr:last-child > * { border-bottom: 2px solid var(--ink); padding-bottom: 8px; }
+table.notation th[scope="rowgroup"] { border-bottom: 0; }
+.prose p { max-width: none; }
+#formulation > .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.model.boxed .mx { font-size: 0.86em; }
+
+/* Worked examples under each equation */
+details.exq { margin: 0 0 8px 0; border-left: 3px solid var(--accent); background: var(--bg); border-radius: 0 8px 8px 0; }
+details.exq summary { cursor: pointer; padding: 4px 12px; font-size: 0.85rem; font-weight: 600; color: var(--accent); width: fit-content; }
+details.exq[open] summary { padding-bottom: 2px; }
+.exbody { padding: 4px 14px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 0.93rem; }
+.exbody p { max-width: none; }
+.exbody .mx { font-size: 0.92em; }
+.exbody .btns { gap: 6px; }
+.exbody .chip { font-size: 0.8rem; padding: 2px 10px; }
+.exbody select { font: inherit; font-size: 0.85rem; padding: 3px 6px; border: 1px solid var(--ink); border-radius: 6px; background: var(--surface); color: var(--ink); width: fit-content; }
+.exlbl { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+.badge { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
+.badge.bind { background: var(--cap-soft); color: var(--cap); }
+.badge.slack { background: var(--accent-soft); color: var(--accent); }
+.exrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Problem type stage */
+.checks { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.muted { color: var(--muted); }
+.nt { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-family: var(--display); font-weight: 800; font-size: 0.75rem; margin-right: 6px; vertical-align: -5px; }
+.nt-s { background: var(--accent); color: #fff; }
+.nt-t { border: 2px solid var(--ink); border-radius: 5px; color: var(--ink); }
+.nt-d { background: var(--ink); color: var(--bg); }
+table.nodetypes td:first-child { white-space: nowrap; font-weight: 600; }
+.family { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fam { margin: 0; border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+.fam.here { border-color: var(--accent); border-width: 2px; }
+.fam svg { width: 100%; height: auto; display: block; }
+.fam-arcs line { stroke: var(--muted); stroke-width: 1.5; }
+.fn-s { fill: var(--accent); } .fn-d { fill: var(--ink); } .fn-t { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
+.fam figcaption { font-size: 0.88rem; color: var(--muted); }
+.fam figcaption b { display: block; color: var(--ink); font-size: 0.95rem; }
+.tile .s:only-of-type { color: var(--ink); }
+@media (max-width: 560px) { .family { grid-template-columns: 1fr; } }
+
+.pager { display: none; }
+
+/* Presenter mode */
+body.presenter { font-size: 1.2rem; }
+body.presenter .study-only { display: none !important; }
+body.presenter .stage { display: none; border: 0; background: transparent; padding: 8px 0; min-height: calc(100vh - 150px); }
+body.presenter .stage.active { display: flex; }
+body.presenter main { max-width: 1400px; padding-top: 16px; }
+body.presenter h2 { font-size: 2.4rem; }
+body.presenter .lede { font-size: 1.3rem; }
+body.presenter .pager { display: flex; position: fixed; right: 20px; bottom: 18px; gap: 8px; z-index: 11; }
+body.presenter .pager button { border: 1px solid var(--ink); background: var(--surface); border-radius: 10px; padding: 8px 16px; cursor: pointer; font-weight: 600; }
+body.presenter .pager span { align-self: center; font-family: var(--mono); color: var(--muted); padding: 0 8px; }
+body.presenter .math { font-size: 1.35rem; }
+body.presenter .mx { font-size: 1.15em; }
+body:not(.presenter) .presenter-only { display: none !important; }
+
+@media (max-width: 860px) {
+  .cols { grid-template-columns: 1fr; }
+  .eq { grid-template-columns: 1fr; }
+  .stage { padding: 20px 16px; }
+  h2 { font-size: 1.45rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .arc, .lbl { transition: opacity 0.2s, stroke 0.2s; }
+}
+
+
+.checks { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.muted { color: var(--muted); }
+.family { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.family.three { grid-template-columns: 1fr 1fr 1fr; }
+.fam { margin: 0; border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+.fam.here { border-color: var(--accent); border-width: 2px; }
+.fam svg { width: 100%; height: auto; display: block; }
+.fam-arcs line { stroke: var(--muted); stroke-width: 1.5; }
+.fn-s { fill: var(--accent); } .fn-d { fill: var(--ink); } .fn-t { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
+.fam figcaption { font-size: 0.86rem; color: var(--muted); }
+.fam figcaption b { display: block; color: var(--ink); font-size: 0.93rem; }
+.tile .s:only-of-type { color: var(--ink); }
+table.matrix.heat td.has { font-weight: 500; }
+table.tableau td { font-size: 0.95rem; }
+@media (max-width: 760px) { .family, .family.three { grid-template-columns: 1fr; } }
+
+
+.modnav { max-width: 1180px; margin: 0 auto 40px; padding: 16px 20px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; border-top: 1px solid var(--line); font-size: 0.9rem; }
+.modnav b { font-family: var(--display); margin-right: 6px; }
+.modnav a { color: var(--ink); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; }
+.modnav a:hover { border-color: var(--ink); }
+.modnav a[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+body.presenter .modnav { display: none; }
+
+</style>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script src="assets/tex-svg.js" async></script>
+</head>
+<body>
+<header class="bar">
+  <div class="bar-inner">
+    <h1>Transportation models · <span>Grand Prix</span></h1>
+    <nav class="stages" id="stageNav" aria-label="Stages"></nav>
+    <div class="mode" role="group" aria-label="View mode">
+      <button id="modeStudy" type="button" aria-pressed="true">Study</button>
+      <button id="modePresent" type="button" aria-pressed="false">Presenter</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+
+<!-- 0 -->
+<section class="stage" id="type" data-title="Problem type">
+  <div class="stage-head"><span class="stage-no">00</span><h2>Problem type: transportation models</h2></div>
+  <p class="lede">A transportation model ships one product from a set of origins directly to a set of destinations. It decides how many units go on each origin to destination route so that every destination gets its demand, no origin ships more than its capacity, and total cost is as low as possible.</p>
+  <div class="cols">
+    <div class="stack">
+      <h3>How to recognise one</h3>
+      <ul class="checks">
+        <li>There are two groups of locations: <b>origins</b> with a limited supply and <b>destinations</b> with a demand.</li>
+        <li>Product goes <b>directly</b> from an origin to a destination. There are no warehouses or stops in between.</li>
+        <li>Each route has a <b>cost per unit</b>. It can include the production cost at the origin as well as the freight.</li>
+        <li>The decisions are <b>how many units on each route</b>: with <i>m</i> origins and <i>n</i> destinations there are <i>m</i> × <i>n</i> variables and <i>m</i> + <i>n</i> constraints.</li>
+      </ul>
+      <h3>The transportation tableau</h3>
+      <p class="muted" style="font-size:0.95rem">The whole model fits in one table. Each row is an origin, each column a destination, and each cell a decision variable. Row totals must not exceed supply; column totals must meet demand.</p>
+      <div class="tbl-wrap">
+        <table class="matrix tableau" aria-label="Transportation tableau">
+          <thead><tr><th></th><th>Dest 1</th><th>Dest 2</th><th>…</th><th>Dest <i>n</i></th><th>Supply</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Origin 1</th><td>\(X_{11}\)</td><td>\(X_{12}\)</td><td>…</td><td>\(X_{1n}\)</td><td>≤ \(S_1\)</td></tr>
+            <tr><th scope="row">…</th><td>…</td><td>…</td><td>…</td><td>…</td><td>…</td></tr>
+            <tr><th scope="row">Origin <i>m</i></th><td>\(X_{m1}\)</td><td>\(X_{m2}\)</td><td>…</td><td>\(X_{mn}\)</td><td>≤ \(S_m\)</td></tr>
+            <tr><th scope="row">Demand</th><td>≥ \(D_1\)</td><td>≥ \(D_2\)</td><td>…</td><td>≥ \(D_n\)</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="stack">
+      <h3>The family of models</h3>
+      <div class="family three">
+        <figure class="fam">
+          <svg viewBox="0 0 220 130" role="img" aria-label="Assignment model: each origin matched to one destination">
+            <g class="fam-arcs"><line x1="40" y1="25" x2="180" y2="65"/><line x1="40" y1="65" x2="180" y2="105"/><line x1="40" y1="105" x2="180" y2="25"/></g>
+            <circle cx="40" cy="25" r="11" class="fn-s"/><circle cx="40" cy="65" r="11" class="fn-s"/><circle cx="40" cy="105" r="11" class="fn-s"/>
+            <circle cx="180" cy="25" r="11" class="fn-d"/><circle cx="180" cy="65" r="11" class="fn-d"/><circle cx="180" cy="105" r="11" class="fn-d"/>
+          </svg>
+          <figcaption><b>Assignment model</b>Every supply and demand equals 1, for example matching staff to tasks.</figcaption>
+        </figure>
+        <figure class="fam here">
+          <svg viewBox="0 0 220 130" role="img" aria-label="Transportation model: origins connect directly to destinations">
+            <g class="fam-arcs">
+              <line x1="40" y1="30" x2="180" y2="20"/><line x1="40" y1="30" x2="180" y2="65"/><line x1="40" y1="30" x2="180" y2="110"/>
+              <line x1="40" y1="100" x2="180" y2="20"/><line x1="40" y1="100" x2="180" y2="65"/><line x1="40" y1="100" x2="180" y2="110"/>
+            </g>
+            <circle cx="40" cy="30" r="11" class="fn-s"/><circle cx="40" cy="100" r="11" class="fn-s"/>
+            <circle cx="180" cy="20" r="11" class="fn-d"/><circle cx="180" cy="65" r="11" class="fn-d"/><circle cx="180" cy="110" r="11" class="fn-d"/>
+          </svg>
+          <figcaption><b>Transportation model</b><span class="tag">This exercise</span> Grand Prix: 3 plants ship cars directly to 4 regions.</figcaption>
+        </figure>
+        <figure class="fam">
+          <svg viewBox="0 0 220 130" role="img" aria-label="General logistics model with warehouses">
+            <g class="fam-arcs">
+              <line x1="30" y1="30" x2="110" y2="40"/><line x1="30" y1="100" x2="110" y2="40"/><line x1="30" y1="100" x2="110" y2="95"/>
+              <line x1="110" y1="40" x2="190" y2="30"/><line x1="110" y1="95" x2="190" y2="30"/><line x1="110" y1="95" x2="190" y2="100"/>
+              <line x1="30" y1="30" x2="190" y2="30"/>
+            </g>
+            <circle cx="30" cy="30" r="11" class="fn-s"/><circle cx="30" cy="100" r="11" class="fn-s"/>
+            <rect x="99" y="29" width="22" height="22" rx="4" class="fn-t"/><rect x="99" y="84" width="22" height="22" rx="4" class="fn-t"/>
+            <circle cx="190" cy="30" r="11" class="fn-d"/><circle cx="190" cy="100" r="11" class="fn-d"/>
+          </svg>
+          <figcaption><b>General logistics model</b>Adds warehouses and route capacities, as in RedBrand.</figcaption>
+        </figure>
+      </div>
+      <h3>Two ways to treat demand</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Demand means</th><th>Constraint</th><th>When to use it</th></tr></thead>
+          <tbody>
+            <tr><td>A minimum requirement</td><td>received ≥ demand</td><td>Forecast orders that must be met. Needs total supply ≥ total demand.</td></tr>
+            <tr><td>The most a region can sell</td><td>received ≤ demand</td><td>Supply is short, or the model maximises profit rather than minimising cost.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Common extension</th><th>What changes in the model</th></tr></thead>
+          <tbody>
+            <tr><td>Several products</td><td>One variable per product per route; products share each route's capacity</td></tr>
+            <tr><td>Route capacities</td><td>Upper bounds \(X_{ij} \le U_{ij}\)</td></tr>
+            <tr><td>Fixed cost to use a route</td><td>Binary variables: the model becomes an integer program</td></tr>
+            <tr><td>Quantity discounts</td><td>Cost per unit falls with volume: the model becomes nonlinear</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="tiles">
+    <div class="tile"><span class="k">Integer flows</span><span class="s">If all supplies and demands are whole numbers, Solver's optimal shipments are whole numbers automatically. No integer constraints are needed, so the fast simplex method can be used.</span></div>
+    <div class="tile"><span class="k">Few routes used</span><span class="s">A basic optimal solution uses at most <i>m</i> + <i>n</i> − 1 routes. With 3 plants and 4 regions that is 6 of the 12.</span></div>
+    <div class="tile"><span class="k">Solution methods</span><span class="s">Solver uses the simplex method. The transportation simplex method is a streamlined version; Vogel's approximation gives a good starting plan by hand.</span></div>
+    <div class="tile"><span class="k">Feasibility check</span><span class="s">With demand as a minimum, total supply must be at least total demand. Check this before running Solver.</span></div>
+  </div>
+  <div class="stack study-only">
+    <h3>Check yourself: is it a transportation model?</h3>
+    <details class="q"><summary>A department assigns four lecturers to four modules so total preparation time is lowest, one module each.</summary><p>Yes, a special case. Each lecturer supplies 1 and each module demands 1, so it is an assignment model, which is a transportation model with all supplies and demands equal to 1.</p></details>
+    <details class="q"><summary>RedBrand ships tomato product from plants, possibly through warehouses, to customers.</summary><p>Not a pure transportation model. Product can stop at warehouses and pass between plants, so it is the more general logistics model.</p></details>
+    <details class="q"><summary>A bakery chain sends bread from 2 bakeries to 6 shops each morning at least delivery cost.</summary><p>Yes. Bakeries are origins with limited output, shops are destinations with orders, and every delivery is direct.</p></details>
+  </div>
+</section>
+
+<!-- 1 -->
+<section class="stage" id="problem" data-title="Problem">
+  <div class="stage-head"><span class="stage-no">01</span><h2>Shipping cars from 3 plants to 4 regions</h2></div>
+  <p class="lede">Grand Prix Automobile makes cars at three plants and ships them to four regions of the country. Find the least-cost shipping plan that stays within plant capacities and meets every region's demand.</p>
+  <div class="cols">
+    <div class="net-wrap"><svg class="net" id="net1" viewBox="0 10 960 470" role="img" aria-label="Three plants and four regions"></svg></div>
+    <div class="stack">
+      <div class="tiles">
+        <div class="tile"><span class="k">Plant capacity</span><span class="v">1,550</span><span class="s">450 + 600 + 500 cars</span></div>
+        <div class="tile"><span class="k">Regional demand</span><span class="v">1,250</span><span class="s">450 + 200 + 300 + 300 cars</span></div>
+        <div class="tile"><span class="k">Spare capacity</span><span class="v">300</span><span class="s">cars that will not be made</span></div>
+        <div class="tile"><span class="k">Routes</span><span class="v">12</span><span class="s">every plant to every region</span></div>
+      </div>
+      <div class="note study-only">
+        <h3>Why ≤ for plants and ≥ for regions</h3>
+        <p>Supply (1,550) is larger than demand (1,250), so plants cannot all ship their full capacity. Plant constraints are therefore "at most", while each region must receive "at least" its demand.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="stage" id="costs" data-title="Costs">
+  <div class="stage-head"><span class="stage-no">02</span><h2>Unit shipping cost on each route</h2></div>
+  <p class="lede">Dollars per car. Darker cells cost more. Hover over or select a cost to find its route on the network.</p>
+  <div class="cols">
+    <div class="net-wrap"><svg class="net" id="net2" viewBox="0 10 960 470" role="img" aria-label="All 12 routes"></svg></div>
+    <div class="stack">
+      <div class="tbl-wrap"><table class="matrix heat" id="costMatrix" aria-label="Unit shipping cost per car"></table></div>
+      <details class="q study-only"><summary>Predict first: which plant will serve each region?</summary><p>A sensible first guess is each region's cheapest plant: Region 1 from Plant 1 (131), Region 2 from Plant 2 (116), Region 3 from Plant 3 (122), Region 4 from Plant 1 (120). But Plant 1 can only make 450 cars and those two regions need 750, so some cars must come from a dearer plant. Stage 05 shows Solver's answer.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="stage" id="formulation" data-title="Formulation">
+  <div class="stage-head"><span class="stage-no">03</span><h2>Model formulation</h2></div>
+  <p class="lede">The model formulation uses the notation in the table: one supply constraint per plant and one demand constraint per region.</p>
+  <div class="cols">
+    <div class="model">
+      <p class="mlabel">Objective function:</p>
+      <div class="mrow"><div class="mx">\[\min \sum_{i\in I}\sum_{j\in J} C_{ij}\,X_{ij}\]</div><span class="mno">(1)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex1"></div></details>
+      <p class="mlabel">Subject to:</p>
+      <div class="mrow"><div class="mx">\[\sum_{j\in J} X_{ij} \;\le\; S_i \qquad \forall i \in I\]</div><span class="mno">(2)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex2"></div></details>
+      <div class="mrow"><div class="mx">\[\sum_{i\in I} X_{ij} \;\ge\; D_j \qquad \forall j \in J\]</div><span class="mno">(3)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex3"></div></details>
+      <div class="mrow"><div class="mx">\[X_{ij} \ge 0 \qquad \forall i \in I,\; \forall j \in J\]</div><span class="mno">(4)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex4"></div></details>
+    </div>
+    <div class="stack">
+      <div class="tbl-wrap">
+        <table class="notation" aria-label="Model notation table">
+          <caption><b>Table 1.</b> Model notation table.</caption>
+          <thead><tr><th></th><th>Notation</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><th scope="rowgroup" rowspan="2">Sets</th><td>\(I\)</td><td>Set of plants, indexed by \(i\), \(I = \{1,2,3\}\)</td></tr>
+            <tr><td>\(J\)</td><td>Set of regions, indexed by \(j\), \(J = \{1,2,3,4\}\)</td></tr>
+            <tr class="grp-start"><th scope="rowgroup" rowspan="3">Parameters</th><td>\(C_{ij}\)</td><td>Cost of shipping one car from plant \(i \in I\) to region \(j \in J\) ($)</td></tr>
+            <tr><td>\(S_i\)</td><td>Capacity of plant \(i \in I\) (cars)</td></tr>
+            <tr><td>\(D_j\)</td><td>Demand of region \(j \in J\) (cars)</td></tr>
+            <tr class="grp-start"><th scope="rowgroup">Decision variables</th><td>\(X_{ij}\)</td><td>Number of cars shipped from plant \(i \in I\) to region \(j \in J\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tiles">
+        <div class="tile"><span class="k">Variables</span><span class="v">12</span><span class="s">3 plants × 4 regions</span></div>
+        <div class="tile"><span class="k">Constraints</span><span class="v">7</span><span class="s">3 supply + 4 demand</span></div>
+        <div class="tile"><span class="k">Model type</span><span class="v">LP</span><span class="s">transportation</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="prose study-only">
+    <p>The objective (1) minimises the total cost of shipping cars from plants to regions. Constraints (2) ensure that for each plant, the total number of cars shipped to all regions does not exceed the plant's capacity. Constraints (3) ensure that for each region, the total number of cars received from all plants meets its demand. Constraints (4) ensure that all shipments are non-negative.</p>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="stage" id="excel" data-title="Excel ↔ maths">
+  <div class="stage-head"><span class="stage-no">04</span><h2>From the spreadsheet to the maths</h2></div>
+  <p class="lede">In <i>Transportation Finished.xlsx</i> the shipping plan is laid out as the transportation tableau itself.</p>
+  <div class="cols">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Range name</th><th>Cells</th><th>Formula</th><th>In the maths</th></tr></thead>
+        <tbody>
+          <tr><td>Unit shipping costs</td><td class="mono">C6:F8</td><td>inputs</td><td>\(C_{ij}\)</td></tr>
+          <tr><td><b>Shipping_Plan</b></td><td class="mono">C13:F15</td><td>changing cells</td><td>\(X_{ij}\)</td></tr>
+          <tr><td>Total_shipped</td><td class="mono">G13:G15</td><td><code>=SUM(C13:F13)</code></td><td>left side of (2)</td></tr>
+          <tr><td>Capacity</td><td class="mono">I13:I15</td><td>inputs</td><td>\(S_i\)</td></tr>
+          <tr><td>Total_received</td><td class="mono">C16:F16</td><td><code>=SUM(C13:C15)</code></td><td>left side of (3)</td></tr>
+          <tr><td>Demand</td><td class="mono">C18:F18</td><td>inputs</td><td>\(D_j\)</td></tr>
+          <tr><td><b>Total_cost</b></td><td class="mono">B21</td><td><code>=SUMPRODUCT(C6:F8,Shipping_Plan)</code></td><td>objective (1)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="stack">
+      <div class="solver-box" aria-label="Solver settings">
+        <b>Solver settings</b>
+        <span>Set objective: Total_cost &nbsp;→ Min</span>
+        <span>By changing: Shipping_Plan</span>
+        <span>Subject to:</span>
+        <span>&nbsp; Total_shipped &lt;= Capacity</span>
+        <span>&nbsp; Total_received &gt;= Demand</span>
+        <span>Make unconstrained variables non-negative ✓</span>
+        <span>Method: Simplex LP</span>
+      </div>
+      <div class="note study-only">
+        <h3>Row sums and column sums</h3>
+        <p>Each plant constraint is a row sum of the plan and each region constraint is a column sum. That is why the tableau layout is so convenient for transportation problems. For larger networks, the list-of-arcs layout with SUMIF used in RedBrand scales better.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="stage" id="solution" data-title="Optimal plan">
+  <div class="stage-head"><span class="stage-no">05</span><h2>The optimal plan costs $176,050</h2></div>
+  <p class="lede">Solver uses 6 of the 12 routes. Thicker lines carry more cars.</p>
+  <div class="cols">
+    <div class="net-wrap"><svg class="net" id="net5" viewBox="0 10 960 470" role="img" aria-label="Optimal shipments"></svg>
+      <div class="legend"><span><i style="border-color:var(--accent)"></i>route used</span><span><i style="border-color:var(--line)"></i>unused</span></div>
+    </div>
+    <div class="stack">
+      <div class="tbl-wrap"><table class="matrix" id="planTable" aria-label="Optimal shipping plan"></table></div>
+      <div class="btns" role="group" aria-label="Highlight a story">
+        <button class="chip" type="button" data-hl="0-0,0-3,1-0,2-0" aria-pressed="false">Region 1 is shared</button>
+        <button class="chip" type="button" data-hl="1-1" aria-pressed="false">Plant 2 has spare capacity</button>
+        <button class="chip" type="button" data-hl="0-0,0-3,1-0,1-1,2-0,2-2" aria-pressed="false">m + n − 1 routes</button>
+      </div>
+      <p id="hlText" class="lede" style="font-size:1rem">Select a story above to highlight its routes.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="stage" id="demand" data-title="What if: demand">
+  <div class="stage-head"><span class="stage-no">06</span><h2>What if demand changes in every region?</h2></div>
+  <p class="lede">The same percentage change is applied to all four regions, as in the SolverTable sheet. The model is re-solved as you drag.</p>
+  <div class="cols">
+    <div class="net-wrap"><svg class="net" id="net6" viewBox="0 10 960 470" role="img" aria-label="Shipments for the chosen demand change"></svg></div>
+    <div class="stack">
+      <div class="ctrl">
+        <label for="demSlider">Change in all demands <output id="demOut" for="demSlider">0%</output></label>
+        <input type="range" id="demSlider" min="-20" max="30" step="5" value="0">
+        <div class="ticks"><span>−20%</span><span>0%</span><span>+15%</span><span>+30%</span></div>
+      </div>
+      <div class="tiles">
+        <div class="tile hot"><span class="k">Total cost</span><span class="v" id="demCost">176,050</span><span class="s">$</span></div>
+        <div class="tile"><span class="k">Total demand</span><span class="v" id="demTot">1,250</span><span class="s">of 1,550 capacity</span></div>
+      </div>
+      <div class="chart"><svg id="demChart" viewBox="0 0 560 250" role="img" aria-label="Total cost against demand change"></svg></div>
+      <details class="q study-only"><summary>Why does the model become infeasible above +20%?</summary><p>At +25% total demand is 1.25 × 1,250 = 1,562.5 cars, more than the 1,550 the plants can make. No shipping plan can meet every region, so Solver reports "Not feasible".</p></details>
+      <details class="q study-only"><summary>Why does the line get steeper as demand rises?</summary><p>Solver always uses the cheapest capacity first. Each extra car has to travel on a dearer route than the last, because the cheap routes and the plants serving them fill up. So cost rises faster and faster: about $1,900 per 1% at −20%, but about $2,660 per 1% above 0%, where Plants 1 and 3 are full and every extra car comes from Plant 2.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section class="stage" id="shadow" data-title="Shadow prices">
+  <div class="stage-head"><span class="stage-no">07</span><h2>What is one more car of capacity worth?</h2></div>
+  <p class="lede">The shadow price of a plant's capacity is how much total cost falls if that plant could make one more car. Pick a plant and change its capacity.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="ctrl">
+        <span style="font-weight:600">Plant</span>
+        <div class="btns" role="group" aria-label="Choose plant" id="spPlant">
+          <button class="chip" type="button" data-p="0" aria-pressed="true">Plant 1</button>
+          <button class="chip" type="button" data-p="1" aria-pressed="false">Plant 2</button>
+          <button class="chip" type="button" data-p="2" aria-pressed="false">Plant 3</button>
+        </div>
+        <label for="spSlider"><span>Capacity of <span id="spName">Plant 1</span></span> <output id="spOut" for="spSlider">450</output></label>
+        <input type="range" id="spSlider" min="200" max="700" step="10" value="450">
+        <div class="ticks"><span>200</span><span>450</span><span>700</span></div>
+      </div>
+      <div class="tiles">
+        <div class="tile hot"><span class="k">Total cost</span><span class="v" id="spCost">176,050</span><span class="s">$</span></div>
+        <div class="tile"><span class="k">Value of one more car</span><span class="v" id="spVal">119</span><span class="s" id="spValS">$ saved per extra car of capacity</span></div>
+      </div>
+      <div class="chart"><svg id="spChart" viewBox="0 0 560 250" role="img" aria-label="Total cost against plant capacity"></svg></div>
+    </div>
+    <div class="stack">
+      <div class="tbl-wrap">
+        <table>
+          <caption style="caption-side:top;text-align:left;padding-bottom:6px"><b>From the Sensitivity Report</b>: shadow prices at the optimal plan</caption>
+          <thead><tr><th>Constraint</th><th class="r">Shadow price</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td>Plant 1 capacity</td><td class="r num">−119</td><td>One more car of capacity cuts cost by $119</td></tr>
+            <tr><td>Plant 2 capacity</td><td class="r num">0</td><td>300 cars spare, so more capacity is worth nothing</td></tr>
+            <tr><td>Plant 3 capacity</td><td class="r num">−72</td><td>One more car of capacity cuts cost by $72</td></tr>
+            <tr><td>Region 1 demand</td><td class="r num">250</td><td>One more car demanded adds $250</td></tr>
+            <tr><td>Region 2 demand</td><td class="r num">116</td><td>One more car demanded adds $116</td></tr>
+            <tr><td>Region 3 demand</td><td class="r num">194</td><td>One more car demanded adds $194</td></tr>
+            <tr><td>Region 4 demand</td><td class="r num">239</td><td>One more car demanded adds $239</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <details class="q study-only"><summary>Why does the value change as capacity grows?</summary><p>A shadow price holds only over a range (the allowable increase and decrease). Plant 1's −119 holds from 300 to 550 cars. Beyond that, the cheapest way to use the extra capacity changes, so the slope of the line changes too.</p></details>
+      <details class="q study-only"><summary>Plant 3 to Region 4 costs 180 and is unused. How much cheaper must it get before Solver uses it?</summary><p>Its reduced cost in the Sensitivity Report is 13, so the unit cost must fall by more than $13, to below $167, before that route enters the optimal plan.</p></details>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer class="modnav" aria-label="Classical optimisation models"><b><a class="home" href="index.html">Classical optimisation models</a></b><a href="scheduling.html">14.1 Employee scheduling</a><a href="blending.html">14.2 Blending</a><a href="transportation.html" aria-current="page">14.3 Transportation</a><a href="redbrand.html">14.4 Logistics (RedBrand)</a><a href="aggregate.html">14.5 Aggregate planning</a></footer>
+<div class="pager" aria-label="Presenter navigation">
+  <button type="button" id="prevBtn">← Back</button>
+  <span id="pageNo">1 / 1</span>
+  <button type="button" id="nextBtn">Next →</button>
+</div>
+<script>
+// Two-phase dense simplex with Bland's rule. Minimise c.x subject to rows, x >= 0.
+// rows: [{a:[...], sense:'<='|'>='|'=', b:number}]
+function solveLP(c, rows) {
+  const EPS = 1e-9;
+  const n = c.length;
+  const m = rows.length;
+  const R = rows.map(r => {
+    if (r.b < 0) return { a: r.a.map(v => -v), b: -r.b, sense: r.sense === '<=' ? '>=' : r.sense === '>=' ? '<=' : '=' };
+    return { a: r.a.slice(), b: r.b, sense: r.sense };
+  });
+  let nSlack = 0, nArt = 0;
+  R.forEach(r => { if (r.sense !== '=') nSlack++; if (r.sense !== '<=') nArt++; });
+  const N = n + nSlack + nArt;
+  const T = [];
+  const basis = [];
+  let si = n, ai = n + nSlack;
+  const artCols = [];
+  R.forEach(r => {
+    const row = new Float64Array(N + 1);
+    for (let j = 0; j < n; j++) row[j] = r.a[j];
+    if (r.sense === '<=') { row[si] = 1; basis.push(si); si++; }
+    else if (r.sense === '>=') { row[si] = -1; si++; row[ai] = 1; basis.push(ai); artCols.push(ai); ai++; }
+    else { row[ai] = 1; basis.push(ai); artCols.push(ai); ai++; }
+    row[N] = r.b;
+    T.push(row);
+  });
+  const isArt = new Uint8Array(N);
+  artCols.forEach(j => isArt[j] = 1);
+
+  function pivot(pr, pc) {
+    const prow = T[pr];
+    const pv = prow[pc];
+    for (let j = 0; j <= N; j++) prow[j] /= pv;
+    for (let i = 0; i < m; i++) {
+      if (i === pr) continue;
+      const f = T[i][pc];
+      if (Math.abs(f) > EPS) { const row = T[i]; for (let j = 0; j <= N; j++) row[j] -= f * prow[j]; }
+    }
+    basis[pr] = pc;
+  }
+  function run(cost, allowed) {
+    for (let iter = 0; iter < 5000; iter++) {
+      // reduced costs
+      let enter = -1;
+      for (let j = 0; j < N; j++) {
+        if (!allowed(j)) continue;
+        let rc = cost[j];
+        for (let i = 0; i < m; i++) rc -= cost[basis[i]] * T[i][j];
+        if (rc < -EPS) { enter = j; break; } // Bland
+      }
+      if (enter < 0) return 'optimal';
+      let leave = -1, best = Infinity;
+      for (let i = 0; i < m; i++) {
+        const a = T[i][enter];
+        if (a > EPS) {
+          const r = T[i][N] / a;
+          if (r < best - EPS || (Math.abs(r - best) <= EPS && basis[i] < basis[leave])) { best = r; leave = i; }
+        }
+      }
+      if (leave < 0) return 'unbounded';
+      pivot(leave, enter);
+    }
+    return 'iterlimit';
+  }
+  // Phase 1
+  const c1 = new Float64Array(N); artCols.forEach(j => c1[j] = 1);
+  run(c1, () => true);
+  let infeas = 0;
+  for (let i = 0; i < m; i++) if (isArt[basis[i]]) infeas += T[i][N];
+  if (infeas > 1e-7) return { status: 'infeasible' };
+  // drive remaining artificials out of basis
+  for (let i = 0; i < m; i++) {
+    if (!isArt[basis[i]]) continue;
+    for (let j = 0; j < n + nSlack; j++) if (Math.abs(T[i][j]) > 1e-9) { pivot(i, j); break; }
+  }
+  // Phase 2
+  const c2 = new Float64Array(N); for (let j = 0; j < n; j++) c2[j] = c[j];
+  const st = run(c2, j => !isArt[j]);
+  if (st !== 'optimal') return { status: st };
+  const x = new Array(n).fill(0);
+  for (let i = 0; i < m; i++) if (basis[i] < n) x[basis[i]] = T[i][N];
+  let z = 0; for (let j = 0; j < n; j++) z += c[j] * x[j];
+  return { status: 'optimal', x, z };
+}
+
+
+// Branch and bound on top of solveLP. ints = indices that must be whole numbers.
+function solveMILP(c, rows, ints) {
+  let best = null, nodes = 0;
+  const stack = [[]];
+  while (stack.length && nodes < 20000) {
+    const extra = stack.pop(); nodes++;
+    const r = solveLP(c, rows.concat(extra));
+    if (r.status !== 'optimal') continue;
+    if (best && r.z >= best.z - 1e-7) continue;
+    let k = -1, worst = 1e-6;
+    for (const j of ints) { const f = Math.abs(r.x[j] - Math.round(r.x[j])); if (f > worst) { worst = f; k = j; } }
+    if (k < 0) { r.x = r.x.map((v, j) => ints.includes(j) ? Math.round(v) : v); best = r; continue; }
+    const lo = new Array(c.length).fill(0); lo[k] = 1;
+    stack.push(extra.concat([{ a: lo, sense: '>=', b: Math.ceil(r.x[k]) }]));
+    stack.push(extra.concat([{ a: lo.slice(), sense: '<=', b: Math.floor(r.x[k]) }]));
+  }
+  return best ? Object.assign(best, { nodes }) : { status: 'infeasible', nodes };
+}
+const row = (n, terms, sense, b) => { const a = new Array(n).fill(0); for (const [j, v] of terms) a[j] += v; return { a, sense, b }; };
+const SVGNS = 'http://www.w3.org/2000/svg';
+const fmt = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString('en-GB', { maximumFractionDigits: d });
+const key = a => a[0] + '-' + a[1];
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+const tnum = (v, d = 2) => fmt(v, d).replace(/,/g, '{,}');
+const cap1 = s => s.replace(/^./, c => c.toUpperCase());
+function typeset(elm) {
+  if (window.MathJax && MathJax.typesetPromise) { try { MathJax.typesetClear([elm]); } catch (e) {} MathJax.typesetPromise([elm]).catch(() => {}); }
+}
+function badge(lhs, rhs, sense, unit) {
+  const gap = sense === '<=' ? rhs - lhs : sense === '>=' ? lhs - rhs : 0;
+  if (Math.abs(gap) < 1e-6) return '<span class="badge bind">binding: no room to spare</span>';
+  return `<span class="badge slack">slack: ${fmt(gap)}${unit ? ' ' + unit : ''} to spare</span>`;
+}
+function chipRow(opts, sel, attr) {
+  return '<div class="btns" role="group" aria-label="Choose an example">' + opts.map(([v, label]) =>
+    `<button type="button" class="chip" ${attr}="${v}" aria-pressed="${String(sel) === String(v)}">${label}</button>`).join('') + '</div>';
+}
+// Worked examples: EX[n] = () => html; chips use data-exv, handler sets EXSEL[n]
+const EX = {}, EXSEL = {};
+function renderEx(n) {
+  const elm = document.getElementById('ex' + n); if (!elm) return;
+  elm.innerHTML = EX[n]();
+  elm.querySelectorAll('[data-exv]').forEach(b => b.addEventListener('click', () => { EXSEL[n] = b.dataset.exv; renderEx(n); }));
+  elm.querySelectorAll('select[data-exsel]').forEach(s => s.addEventListener('change', () => { EXSEL[n] = s.value; renderEx(n); }));
+  typeset(elm);
+}
+function renderAllEx() { Object.keys(EX).forEach(n => renderEx(n)); }
+// ---------- Line chart ----------
+function drawChart(svg, pts, cur, o) {
+  svg.innerHTML = '';
+  const W = 560, H = 250, L = 62, R = 18, T = 30, B = 42;
+  const xs = pts.map(p => p.x), ys = pts.filter(p => p.y != null).map(p => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const lo0 = o.fit ? Math.min(...ys) : 0, rawStep = (Math.max(...ys) - lo0) / 4 || Math.max(...ys) / 4 || 1, mag = 10 ** Math.floor(Math.log10(rawStep));
+  const ystep = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= rawStep);
+  const yMin = o.fit ? Math.floor(lo0 / ystep) * ystep : 0, yMax = Math.max(yMin + ystep, Math.ceil(Math.max(...ys) / ystep) * ystep);
+  const sx = v => L + (v - x0) / (x1 - x0) * (W - L - R);
+  const sy = v => H - B - (v - yMin) / (yMax - yMin) * (H - T - B);
+  for (let v = yMin; v <= yMax + 1e-9; v += ystep) {
+    el('line', { x1: L, x2: W - R, y1: sy(v), y2: sy(v), class: 'ch-grid' }, svg);
+    el('text', { x: L - 8, y: sy(v) + 4, 'text-anchor': 'end', class: 'ch-txt' }, svg).textContent = fmt(v, 0);
+  }
+  o.xTicks.forEach(v => {
+    el('text', { x: sx(v), y: H - B + 18, 'text-anchor': 'middle', class: 'ch-txt' }, svg).textContent = o.xFmt(v);
+  });
+  el('line', { x1: L, x2: W - R, y1: H - B, y2: H - B, class: 'ch-axis' }, svg);
+  el('text', { x: L, y: 16, class: 'ch-ttl' }, svg).textContent = o.yLabel;
+  el('text', { x: W - R, y: H - 4, 'text-anchor': 'end', class: 'ch-ttl' }, svg).textContent = o.xLabel;
+  const ok = pts.filter(p => p.y != null);
+  const line = ok.map((p, i) => (i ? 'L' : 'M') + sx(p.x).toFixed(1) + ',' + sy(p.y).toFixed(1)).join(' ');
+  el('path', { d: line + ` L${sx(ok[ok.length - 1].x)},${sy(yMin)} L${sx(ok[0].x)},${sy(yMin)} Z`, class: 'ch-area' }, svg);
+  el('path', { d: line, class: 'ch-line' }, svg);
+  const c = pts.find(p => Math.abs(p.x - cur) < 1e-9);
+  if (c && c.y != null) {
+    el('line', { x1: sx(c.x), x2: sx(c.x), y1: sy(c.y), y2: H - B, class: 'ch-grid', 'stroke-dasharray': '3 3' }, svg);
+    el('circle', { cx: sx(c.x), cy: sy(c.y), r: 6, class: 'ch-dot' }, svg);
+    const right = sx(c.x) > W - 130;
+    const yfmt = o.yFmt || (v => fmt(v, 1));
+    el('text', { x: sx(c.x) + (right ? -12 : 12), y: sy(c.y) - 10, 'text-anchor': right ? 'end' : 'start', class: 'ch-cur' }, svg).textContent = yfmt(c.y);
+  }
+}
+
+function initNav() {
+const stages = [...document.querySelectorAll('.stage')];
+const nav = document.getElementById('stageNav');
+let cur = 0;
+stages.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.textContent = `${s.querySelector('.stage-no').textContent}  ${s.dataset.title}`;
+  b.addEventListener('click', () => go(i, true));
+  nav.appendChild(b);
+});
+function presenter() { return document.body.classList.contains('presenter'); }
+function go(i, scroll) {
+  cur = Math.max(0, Math.min(stages.length - 1, i));
+  stages.forEach((s, k) => s.classList.toggle('active', k === cur));
+  [...nav.children].forEach((b, k) => b.setAttribute('aria-current', k === cur ? 'true' : 'false'));
+  document.getElementById('pageNo').textContent = `${cur + 1} / ${stages.length}`;
+  if (presenter()) window.scrollTo(0, 0);
+  else if (scroll) stages[cur].scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+function setMode(m) {
+  document.body.classList.toggle('presenter', m === 'presenter');
+  document.getElementById('modeStudy').setAttribute('aria-pressed', m === 'study');
+  document.getElementById('modePresent').setAttribute('aria-pressed', m === 'presenter');
+  try { localStorage.setItem('om-mode', m); } catch (e) {}
+  go(cur, m === 'study');
+}
+document.getElementById('modeStudy').addEventListener('click', () => setMode('study'));
+document.getElementById('modePresent').addEventListener('click', () => setMode('presenter'));
+document.getElementById('prevBtn').addEventListener('click', () => go(cur - 1));
+document.getElementById('nextBtn').addEventListener('click', () => go(cur + 1));
+document.addEventListener('keydown', e => {
+  if (!presenter() || e.target.tagName === 'INPUT') return;
+  if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(cur + 1); }
+  if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); go(cur - 1); }
+});
+if ('IntersectionObserver' in window) {
+  const io = new IntersectionObserver(es => {
+    if (presenter()) return;
+    es.forEach(e => { if (e.isIntersecting) { cur = stages.indexOf(e.target); [...nav.children].forEach((b, k) => b.setAttribute('aria-current', k === cur ? 'true' : 'false')); } });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  stages.forEach(s => io.observe(s));
+}
+let saved = 'study';
+try { saved = localStorage.getItem('om-mode') || 'study'; } catch (e) {}
+setMode(saved);
+go(0, false);
+}
+
+
+const C = [[131,218,266,120],[250,116,263,278],[178,132,122,180]];
+const S0 = [450,600,500], D0 = [450,200,300,300];
+function solveT(S, D) {
+  const c = [], rows = [];
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 4; j++) c.push(C[i][j]);
+  for (let i = 0; i < 3; i++) rows.push(row(12, [0,1,2,3].map(j => [i*4+j, 1]), '<=', S[i]));
+  for (let j = 0; j < 4; j++) rows.push(row(12, [0,1,2].map(i => [i*4+j, 1]), '>=', D[j]));
+  const r = solveLP(c, rows);
+  if (r.status === 'optimal') r.X = [0,1,2].map(i => r.x.slice(i*4, i*4+4).map(v => Math.abs(v) < 1e-7 ? 0 : v));
+  return r;
+}
+const base = solveT(S0, D0);
+const PP = [[150,90],[150,240],[150,390]], RP = [[790,50],[790,170],[790,290],[790,410]];
+const LT = [0.25, 0.42, 0.25];
+
+function drawT(svg, X, opts = {}) {
+  svg.innerHTML = '';
+  const id = svg.id;
+  const defs = el('defs', {}, svg);
+  ['faint','used','hl'].forEach(n => { const m = el('marker', { id: `${id}-${n}`, viewBox: '0 0 10 10', refX: 8, refY: 5, markerWidth: 11, markerHeight: 11, markerUnits: 'userSpaceOnUse', orient: 'auto' }, defs); el('path', { d: 'M0,0 L10,5 L0,10 z', class: 'mk-' + n }, m); });
+  const ga = el('g', {}, svg), gl = el('g', {}, svg), gn = el('g', {}, svg);
+  const hl = opts.hl;
+  if (opts.arcs !== false) for (let i = 0; i < 3; i++) for (let j = 0; j < 4; j++) {
+    const f = X ? X[i][j] : 0;
+    if (X && f <= 0 && !opts.showUnused) continue;
+    const [x0, y0] = PP[i], [x1, y1] = RP[j];
+    const dx = x1 - x0, dy = y1 - y0, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L;
+    const sx = x0 + ux * 31, sy = y0 + uy * 31, ex = x1 - ux * 35, ey = y1 - uy * 35;
+    let cls = 'arc', mk = 'faint';
+    if (f > 0) { cls += ' used'; mk = 'used'; }
+    const k = i + '-' + j;
+    if (hl && hl.size) { if (hl.has(k)) { cls += ' hl'; mk = 'hl'; } else cls += ' dim'; }
+    const p = el('path', { d: `M${sx},${sy} L${ex},${ey}`, class: cls, 'stroke-width': f > 0 ? 2.5 + 7 * f / 500 : 1.6, 'marker-end': `url(#${id}-${mk})`, 'data-arc': k }, ga);
+    el('title', {}, p).textContent = `Plant ${i+1} → Region ${j+1}: $${C[i][j]} per car` + (f > 0 ? `, ${fmt(f)} cars` : '');
+    if (f > 0) {
+      const t = LT[i], lx = sx + (ex - sx) * t, ly = sy + (ey - sy) * t, txt = fmt(f), w = 12 + txt.length * 9;
+      const g = el('g', { class: 'lbl used' + (hl && hl.size && !hl.has(k) ? ' dim' : '') }, gl);
+      el('rect', { x: lx - w/2, y: ly - 11, width: w, height: 22, rx: 5 }, g);
+      el('text', { x: lx, y: ly + 4.5, 'text-anchor': 'middle' }, g).textContent = txt;
+    }
+  }
+  const S = opts.S || S0, D = opts.D || D0;
+  PP.forEach(([x, y], i) => {
+    el('circle', { cx: x, cy: y, r: 28, class: 'node-plant' }, gn);
+    el('text', { x, y: y + 1, class: 'node-num on-plant' }, gn).textContent = i + 1;
+    const out = X ? X[i].reduce((a, b) => a + b, 0) : null;
+    el('text', { x: x - 44, y: y - 4, class: 'cap1', 'text-anchor': 'end', style: 'text-anchor:end' }, gn).textContent = `Plant ${i+1}`;
+    el('text', { x: x - 44, y: y + 14, class: 'cap2', style: 'text-anchor:end' }, gn).textContent = X ? `${fmt(out)} / ${fmt(S[i])}` : `cap ${fmt(S[i])}`;
+  });
+  RP.forEach(([x, y], j) => {
+    el('circle', { cx: x, cy: y, r: 28, class: 'node-cust' }, gn);
+    el('text', { x, y: y + 1, class: 'node-num on-cust' }, gn).textContent = j + 1;
+    const inn = X ? X.reduce((a, r) => a + r[j], 0) : null;
+    el('text', { x: x + 44, y: y - 4, class: 'cap1', style: 'text-anchor:start' }, gn).textContent = `Region ${j+1}`;
+    el('text', { x: x + 44, y: y + 14, class: 'cap2', style: 'text-anchor:start' }, gn).textContent = X ? `${fmt(inn)} / ${fmt(D[j])}` : `needs ${fmt(D[j])}`;
+  });
+}
+
+// Stage 1, 2
+drawT(document.getElementById('net1'), null, { arcs: false });
+const net2 = document.getElementById('net2');
+drawT(net2, null);
+(function () {
+  const t = document.getElementById('costMatrix');
+  const flat = C.flat(), lo = Math.min(...flat), hi = Math.max(...flat);
+  let h = '<thead><tr><th scope="col">$ per car</th>' + [1,2,3,4].map(j => `<th scope="col">Region ${j}</th>`).join('') + '<th scope="col">Capacity</th></tr></thead><tbody>';
+  C.forEach((r, i) => {
+    h += `<tr><th scope="row">Plant ${i+1}</th>` + r.map((v, j) => {
+      const pct = Math.round(12 + 70 * (v - lo) / (hi - lo));
+      return `<td class="has" tabindex="0" data-arc="${i}-${j}" style="background:color-mix(in srgb, var(--accent) ${pct}%, transparent);${pct > 50 ? 'color:#fff' : ''}">${v}</td>`;
+    }).join('') + `<td>${S0[i]}</td></tr>`;
+  });
+  h += '<tr><th scope="row">Demand</th>' + D0.map(d => `<td>${d}</td>`).join('') + '<td></td></tr></tbody>';
+  t.innerHTML = h;
+  const set = (arc, on) => {
+    net2.querySelectorAll('path.arc').forEach(p => { const m = on && p.dataset.arc === arc; p.classList.toggle('hl', m); p.classList.toggle('dim', on && !m); p.setAttribute('marker-end', `url(#net2-${m ? 'hl' : 'faint'})`); });
+    t.querySelectorAll('td.has').forEach(td => td.classList.toggle('on', on && td.dataset.arc === arc));
+  };
+  t.querySelectorAll('td.has').forEach(td => {
+    td.addEventListener('mouseenter', () => set(td.dataset.arc, true)); td.addEventListener('focus', () => set(td.dataset.arc, true));
+    td.addEventListener('mouseleave', () => set(null, false)); td.addEventListener('blur', () => set(null, false));
+  });
+})();
+
+// Examples
+const xs = (i, j) => `X_{${i}${j}}`;
+EXSEL[2] = '1'; EXSEL[3] = '1'; EXSEL[4] = '3-4';
+EX[1] = () => {
+  const rows = C.map((r, i) => r.map((c, j) => `${c}${xs(i+1, j+1)}`).join(' + '));
+  const used = []; base.X.forEach((r, i) => r.forEach((v, j) => { if (v > 0) used.push([i, j, v]); }));
+  const terms = used.map(([i, j, v]) => `${C[i][j]}(${tnum(v)})`);
+  return `<p>The double sum runs over every plant \\(i\\) and every region \\(j\\): 3 × 4 = 12 terms, one per route. Grouped by plant:</p>
+  <div class="mx">\\[\\begin{aligned} Z = {} & ${rows.join(' \\\\ & + ')} \\end{aligned}\\]</div>
+  <span class="exlbl">With the optimal plan (stage 05)</span>
+  <p>${12 - used.length} routes carry no cars, so only ${used.length} terms remain:</p>
+  <div class="mx">\\[\\begin{aligned} Z = {} & ${terms.slice(0, 3).join(' + ')} \\\\ & + ${terms.slice(3).join(' + ')} \\\\ = {} & ${tnum(base.z)} \\end{aligned}\\]</div>
+  <p>Total cost is $${fmt(base.z)}, matching Total_cost in Excel.</p>`;
+};
+EX[2] = () => {
+  const i = +EXSEL[2] - 1, out = base.X[i].reduce((a, b) => a + b, 0);
+  return chipRow([[1,'Plant 1'],[2,'Plant 2'],[3,'Plant 3']], EXSEL[2], 'data-exv') +
+  `<p>For \\(i = ${i+1}\\), the sum runs over every region \\(j \\in J = \\{1,2,3,4\\}\\): all cars leaving plant ${i+1}. In Excel this is row ${13+i} of Shipping_Plan.</p>
+  <span class="exlbl">Written out</span><div class="mx">\\[${[1,2,3,4].map(j => xs(i+1, j)).join(' + ')} \\le S_{${i+1}} = ${S0[i]}\\]</div>
+  <span class="exlbl">With the optimal plan (stage 05)</span><div class="mx">\\[${base.X[i].map(v => tnum(v)).join(' + ')} = ${tnum(out)} \\le ${S0[i]}\\]</div>
+  <p>Plant ${i+1} ships ${fmt(out)} cars. ${badge(out, S0[i], '<=', 'cars')}</p>
+  <p class="ex">Constraint (2) creates 3 constraints, one for each plant.</p>`;
+};
+EX[3] = () => {
+  const j = +EXSEL[3] - 1, inn = base.X.reduce((a, r) => a + r[j], 0);
+  return chipRow([[1,'Region 1'],[2,'Region 2'],[3,'Region 3'],[4,'Region 4']], EXSEL[3], 'data-exv') +
+  `<p>For \\(j = ${j+1}\\), the sum runs over every plant \\(i \\in I = \\{1,2,3\\}\\): all cars arriving in region ${j+1}. In Excel this is column ${'CDEF'[j]} of Shipping_Plan.</p>
+  <span class="exlbl">Written out</span><div class="mx">\\[${[1,2,3].map(i => xs(i, j+1)).join(' + ')} \\ge D_{${j+1}} = ${D0[j]}\\]</div>
+  <span class="exlbl">With the optimal plan (stage 05)</span><div class="mx">\\[${base.X.map(r => tnum(r[j])).join(' + ')} = ${tnum(inn)} \\ge ${D0[j]}\\]</div>
+  <p>Region ${j+1} receives ${fmt(inn)} cars. ${badge(inn, D0[j], '>=', 'cars')}</p>
+  <p class="ex">Constraint (3) creates 4 constraints, one for each region.</p>`;
+};
+EX[4] = () => {
+  const [i, j] = EXSEL[4].split('-').map(Number), v = base.X[i-1][j-1];
+  let sel = '<label class="exrow"><span class="exlbl">Route</span><select data-exsel="4">';
+  for (let a = 1; a <= 3; a++) for (let b = 1; b <= 4; b++) sel += `<option value="${a}-${b}"${a + '-' + b === EXSEL[4] ? ' selected' : ''}>Plant ${a} → Region ${b} (${fmt(base.X[a-1][b-1])} cars)</option>`;
+  sel += '</select></label>';
+  return sel + `<span class="exlbl">Written out</span><div class="mx">\\[${xs(i, j)} \\ge 0\\]</div>
+  <span class="exlbl">With the optimal plan (stage 05)</span><div class="mx">\\[${tnum(v)} \\ge 0\\]</div>
+  ${v > 0 ? `<p>This route is used. <span class="badge slack">above its lower limit</span></p>` : `<p>This route is unused: it sits at the lowest value (4) allows. <span class="badge bind">binding at zero</span></p>`}
+  <p class="ex">Constraint (4) creates 12 constraints, one per route. Without it Solver could ship a negative number of cars, which has no meaning. In the optimal plan 6 routes are used and 6 sit at zero.</p>`;
+};
+
+// Stage 5
+const net5 = document.getElementById('net5');
+drawT(net5, base.X);
+(function () {
+  let h = '<thead><tr><th scope="col">Cars</th>' + [1,2,3,4].map(j => `<th scope="col">R${j}</th>`).join('') + '<th scope="col">Shipped</th><th scope="col">Spare</th></tr></thead><tbody>';
+  base.X.forEach((r, i) => { const s = r.reduce((a, b) => a + b, 0); h += `<tr><th scope="row">Plant ${i+1}</th>` + r.map(v => `<td${v > 0 ? ' style="font-weight:600;color:var(--accent)"' : ' class="none"'}>${v > 0 ? fmt(v) : '0'}</td>`).join('') + `<td>${fmt(s)}</td><td>${fmt(S0[i] - s)}</td></tr>`; });
+  h += '<tr><th scope="row">Received</th>' + [0,1,2,3].map(j => `<td>${fmt(base.X.reduce((a, r) => a + r[j], 0))}</td>`).join('') + '<td></td><td></td></tr></tbody>';
+  document.getElementById('planTable').innerHTML = h;
+})();
+const HL = {
+  '0-0,0-3,1-0,2-0': 'Region 1 needs 450 cars and gets them from all three plants: 150 from Plant 1, 100 from Plant 2 and 200 from Plant 3. Plant 1 sends most of its cars to Region 4, where its cost advantage is largest.',
+  '1-1': 'Plant 2 ships only 300 of its 600 cars, all on cheap routes. Its spare 300 cars are exactly the gap between total supply and total demand.',
+  '0-0,0-3,1-0,1-1,2-0,2-2': 'With 3 plants and 4 regions, a basic optimal solution uses at most 3 + 4 − 1 = 6 routes. This plan uses exactly 6.'
+};
+document.querySelectorAll('#solution .chip').forEach(b => b.addEventListener('click', () => {
+  const on = b.getAttribute('aria-pressed') !== 'true';
+  document.querySelectorAll('#solution .chip').forEach(x => x.setAttribute('aria-pressed', 'false'));
+  b.setAttribute('aria-pressed', String(on));
+  drawT(net5, base.X, { hl: on ? new Set(b.dataset.hl.split(',')) : null });
+  document.getElementById('hlText').textContent = on ? HL[b.dataset.hl] : 'Select a story above to highlight its routes.';
+}));
+
+// Stage 6
+const demPts = [];
+for (let p = -20; p <= 30; p += 5) { const r = solveT(S0, D0.map(d => d * (1 + p / 100))); demPts.push({ x: p, y: r.status === 'optimal' ? r.z : null }); }
+const demS = document.getElementById('demSlider');
+function upd6() {
+  const p = +demS.value, D = D0.map(d => d * (1 + p / 100)), r = solveT(S0, D), tot = D.reduce((a, b) => a + b, 0);
+  document.getElementById('demOut').textContent = (p > 0 ? '+' : p < 0 ? '−' : '') + Math.abs(p) + '%';
+  document.getElementById('demTot').textContent = fmt(tot);
+  if (r.status !== 'optimal') {
+    document.getElementById('demCost').textContent = 'Not feasible';
+    drawT(document.getElementById('net6'), null, { D, arcs: false });
+  } else {
+    document.getElementById('demCost').textContent = fmt(r.z);
+    drawT(document.getElementById('net6'), r.X, { D });
+  }
+  drawChart(document.getElementById('demChart'), demPts, p, { xLabel: 'change in all demands (%)', yLabel: 'Total cost ($)', xTicks: [-20, -10, 0, 10, 20, 30], xFmt: v => (v > 0 ? '+' : '') + v + '%', fit: true });
+}
+demS.addEventListener('input', upd6); upd6();
+
+// Stage 7
+let spP = 0;
+const spS = document.getElementById('spSlider');
+function spCost(cap) { const S = S0.slice(); S[spP] = cap; const r = solveT(S, D0); return r.status === 'optimal' ? r.z : null; }
+function upd7() {
+  const cap = +spS.value, z = spCost(cap);
+  document.getElementById('spOut').textContent = cap;
+  document.getElementById('spName').textContent = `Plant ${spP + 1}`;
+  document.getElementById('spCost').textContent = z == null ? 'Not feasible' : fmt(z);
+  const zUp = spCost(cap + 1), zDn = spCost(cap - 1);
+  let v = null;
+  if (z != null && zUp != null) v = z - zUp; else if (z != null && zDn != null) v = zDn - z;
+  document.getElementById('spVal').textContent = v == null ? 'n/a' : fmt(v);
+  document.getElementById('spValS').textContent = v == null ? 'model not feasible here' : v === 0 ? 'capacity here is not a bottleneck' : '$ saved per extra car of capacity';
+  const pts = []; for (let c = 200; c <= 700; c += 10) pts.push({ x: c, y: spCost(c) });
+  drawChart(document.getElementById('spChart'), pts, cap, { xLabel: `capacity of Plant ${spP + 1} (cars)`, yLabel: 'Total cost ($)', xTicks: [200, 300, 400, 500, 600, 700], xFmt: v => v, fit: true });
+}
+document.querySelectorAll('#spPlant .chip').forEach(b => b.addEventListener('click', () => {
+  spP = +b.dataset.p; document.querySelectorAll('#spPlant .chip').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  spS.value = S0[spP]; upd7();
+}));
+spS.addEventListener('input', upd7); upd7();
+
+initNav();
+renderAllEx();
+</script>
+</body>
+</html>

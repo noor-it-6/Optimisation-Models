@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Classical Optimisation Models</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=IBM+Plex+Sans:wght@400;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  /* Layout: a sticky stage bar over one column of numbered stages; presenter mode shows one stage at a time, large. */
+  --bg: #f4f5f6;
+  --surface: #ffffff;
+  --ink: #18212b;
+  --muted: #5a6570;
+  --line: #d8dde2;
+  --accent: #c9352a;      /* tomato red: plants and product flow */
+  --accent-soft: #f7e3e0;
+  --cap: #b77900;         /* semantic: arc at capacity */
+  --cap-soft: #fbefd6;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161b; --surface: #192027; --ink: #e6eaee; --muted: #9ba6b1; --line: #2d3640;
+    --accent: #ff6b57; --accent-soft: #3a211e; --cap: #f0b43a; --cap-soft: #3a2f17;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161b; --surface: #192027; --ink: #e6eaee; --muted: #9ba6b1; --line: #2d3640;
+  --accent: #ff6b57; --accent-soft: #3a211e; --cap: #f0b43a; --cap-soft: #3a2f17;
+  color-scheme: dark;
+}
+
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.55; }
+main { max-width: 980px; margin: 0 auto; padding: 48px 20px 64px; display: flex; flex-direction: column; gap: 28px; }
+h1 { font-family: var(--display); font-weight: 800; font-size: 2.2rem; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+h1 span { color: var(--accent); }
+.lede { color: var(--muted); font-size: 1.1rem; max-width: 65ch; margin: 0; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+a.card { display: flex; flex-direction: column; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; color: inherit; text-decoration: none; }
+a.card:hover, a.card:focus-visible { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.no { font-family: var(--mono); color: var(--accent); font-size: 0.9rem; }
+.card h2 { font-family: var(--display); font-size: 1.3rem; margin: 0; }
+.card .case { color: var(--muted); font-size: 0.95rem; margin-top: -6px; }
+.card h2 small { font-family: var(--body); font-weight: 400; color: var(--muted); font-size: 0.95rem; }
+.card p { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.card .go { margin-top: auto; font-weight: 600; color: var(--accent); }
+.how { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px 22px; }
+.how h2 { font-family: var(--display); font-size: 1.05rem; margin: 0 0 6px; }
+.how ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+</style>
+</head>
+<body>
+<main>
+  <header style="display:flex;flex-direction:column;gap:10px">
+    <h1>Classical <span>optimisation models</span></h1>
+    <p class="lede">Interactive versions of the five classical optimisation models in Business Analytics. Each page explains the type of problem, builds the mathematical model step by step, links it to the Excel Solver workbook, and lets you change the data and see the optimal plan update.</p>
+  </header>
+  <div class="grid">
+    <a class="card" href="scheduling.html"><span class="no">14.1</span><h2>Employee scheduling</h2><span class="case">Briggs</span><p>Choose how many staff start each day so every day is covered with the fewest employees. LP vs integer answers, and build your own schedule.</p><span class="go">Open model →</span></a>
+    <a class="card" href="blending.html"><span class="no">14.2</span><h2>Blending</h2><span class="case">Chandler Oil</span><p>Blend two crude oils into gasoline and heating oil that meet quality limits, at maximum revenue. Weighted-average quality and price sensitivity.</p><span class="go">Open model →</span></a>
+    <a class="card" href="transportation.html"><span class="no">14.3</span><h2>Transportation</h2><span class="case">Grand Prix</span><p>Ship cars from three plants to four regions at least cost. The transportation tableau, demand changes and shadow prices.</p><span class="go">Open model →</span></a>
+    <a class="card" href="redbrand.html"><span class="no">14.4</span><h2>Logistics networks</h2><span class="case">RedBrand</span><p>Route tomato product from plants through warehouses to customers. Net-flow constraints, arc capacities and shrinkage.</p><span class="go">Open model →</span></a>
+    <a class="card" href="aggregate.html"><span class="no">14.5</span><h2>Aggregate planning</h2><span class="case">SureStep</span><p>Plan workforce, production and inventory over four months. Backlogging, shortage costs and the rolling planning horizon.</p><span class="go">Open model →</span></a>
+  </div>
+  <section class="how">
+    <h2>How to use these pages</h2>
+    <ul>
+      <li><b>Study</b> mode shows every stage with notes, predict-first questions and challenges. <b>Presenter</b> mode shows one stage at a time; use the arrow keys or Back and Next.</li>
+      <li>Under each equation, open <b>Example</b> to see it written out in full with the optimal numbers plugged in.</li>
+      <li>Sliders re-solve the model in your browser, so you can explore what-if questions alongside the Excel files.</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>
