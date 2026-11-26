@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Great Threads Fixed-Cost Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  /* Layout: a sticky stage bar over one column of numbered stages; presenter mode shows one stage at a time, large. */
+  --bg: #f4f5f6;
+  --surface: #ffffff;
+  --ink: #18212b;
+  --muted: #5a6570;
+  --line: #d8dde2;
+  --accent: #c9352a;      /* tomato red: plants and product flow */
+  --accent-soft: #f7e3e0;
+  --cap: #b77900;         /* semantic: arc at capacity */
+  --cap-soft: #fbefd6;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161b; --surface: #192027; --ink: #e6eaee; --muted: #9ba6b1; --line: #2d3640;
+    --accent: #ff6b57; --accent-soft: #3a211e; --cap: #f0b43a; --cap-soft: #3a2f17;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161b; --surface: #192027; --ink: #e6eaee; --muted: #9ba6b1; --line: #2d3640;
+  --accent: #ff6b57; --accent-soft: #3a211e; --cap: #f0b43a; --cap-soft: #3a2f17;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.55; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.015em; }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Top bar */
+.bar { position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar-inner { max-width: 1180px; margin: 0 auto; padding: 10px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
+.bar h1 span { color: var(--accent); }
+.stages { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto; }
+.stages button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 3px 11px; font-size: 0.82rem; cursor: pointer; color: var(--muted); }
+.stages button:hover { color: var(--ink); border-color: var(--muted); }
+.stages button[aria-current="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.mode { display: inline-flex; border: 1px solid var(--ink); border-radius: 8px; overflow: hidden; }
+.mode button { border: 0; background: transparent; padding: 5px 13px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
+.mode button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+main { max-width: 1180px; margin: 0 auto; padding: 24px 20px 80px; display: flex; flex-direction: column; gap: 28px; }
+.stage { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 20px; scroll-margin-top: 90px; }
+.stage-head { display: flex; align-items: baseline; gap: 14px; }
+.stage-no { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); font-weight: 500; }
+.lede { font-size: 1.08rem; color: var(--muted); }
+.cols { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+
+/* Study-only material */
+.note { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; display: flex; flex-direction: column; gap: 6px; }
+.note h3 { font-size: 0.95rem; }
+details.q { border: 1px dashed var(--muted); border-radius: 8px; padding: 10px 14px; }
+details.q summary { cursor: pointer; font-weight: 600; }
+details.q summary::marker { color: var(--accent); }
+details.q[open] summary { margin-bottom: 8px; }
+.tag { display: inline-block; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); }
+
+/* Data tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tile { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.tile .k { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.tile .v { font-family: var(--mono); font-size: 1.35rem; font-weight: 500; }
+.tile .s { font-size: 0.85rem; color: var(--muted); }
+.tile.hot { border-color: var(--accent); }
+.tile.hot .v { color: var(--accent); }
+
+/* Network */
+.net-wrap { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow-x: auto; }
+svg.net { display: block; width: 100%; min-width: 560px; height: auto; }
+.arc { fill: none; stroke: var(--line); stroke-width: 1.6; }
+.arc.used { stroke: var(--accent); }
+.arc.cap { stroke: var(--cap); }
+.arc.hl { stroke: var(--ink); stroke-width: 4; }
+.arc.dim { opacity: 0.18; }
+.mk-faint { fill: var(--line); } .mk-used { fill: var(--accent); } .mk-cap { fill: var(--cap); } .mk-hl { fill: var(--ink); }
+.lbl rect { fill: var(--surface); stroke: currentColor; stroke-width: 1.2; }
+.lbl text { font-family: var(--mono); font-size: 15px; font-weight: 500; fill: var(--ink); }
+.lbl.used { color: var(--accent); } .lbl.cap { color: var(--cap); } .lbl.dim { opacity: 0.2; }
+.node-plant { fill: var(--accent); }
+.node-wh { fill: var(--surface); stroke: var(--ink); stroke-width: 2.5; }
+.node-cust { fill: var(--ink); }
+.node-num { font-family: var(--display); font-weight: 800; font-size: 22px; text-anchor: middle; dominant-baseline: central; }
+.node-num.on-plant { fill: #fff; } .node-num.on-wh { fill: var(--ink); } .node-num.on-cust { fill: var(--bg); }
+.cap1 { font-family: var(--body); font-size: 16px; font-weight: 600; fill: var(--ink); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.cap2 { font-family: var(--mono); font-size: 14px; fill: var(--muted); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.85rem; color: var(--muted); padding: 8px 14px; border-top: 1px solid var(--line); }
+.legend i { display: inline-block; width: 22px; height: 0; border-top: 4px solid; vertical-align: middle; margin-right: 6px; }
+.legend .sw { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin-right: 6px; }
+
+/* Tables */
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { padding: 6px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+td.r, th.r { text-align: right; }
+table.matrix td, table.matrix th { text-align: center; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+table.matrix td.has { cursor: pointer; }
+table.matrix td.has:hover, table.matrix td.has.on { background: var(--ink); color: var(--bg); }
+table.matrix td.none { color: var(--line); }
+table.matrix th[scope="row"] { color: var(--ink); }
+.grp { font-size: 0.7rem; color: var(--muted); display: block; font-family: var(--body); font-weight: 400; letter-spacing: 0; text-transform: none; }
+tr.total td { font-weight: 600; border-top: 2px solid var(--ink); border-bottom: 0; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; overflow-wrap: anywhere; }
+
+/* Maths */
+.math { font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif; font-size: 1.12rem; }
+.math i { font-style: italic; }
+.eqs { display: flex; flex-direction: column; gap: 14px; }
+.eq { display: grid; grid-template-columns: 170px 1fr; gap: 6px 18px; align-items: baseline; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.eq:last-child { border-bottom: 0; }
+.eq .name { font-weight: 600; font-size: 0.92rem; }
+.eq .name small { display: block; font-weight: 400; color: var(--muted); }
+.eq .body { display: flex; flex-direction: column; gap: 4px; }
+.eq .ex { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); }
+.net-term { background: var(--accent-soft); border-radius: 4px; padding: 0 4px; }
+.sigma { font-size: 1.3em; vertical-align: -0.12em; }
+
+/* Controls */
+.ctrl { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.ctrl label { font-weight: 600; display: flex; justify-content: space-between; gap: 10px; }
+.ctrl output { font-family: var(--mono); color: var(--accent); font-weight: 500; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.ticks { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--ink); background: transparent; border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 0.88rem; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.chart { border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.chart svg { display: block; width: 100%; height: auto; }
+.ch-axis { stroke: var(--muted); stroke-width: 1; }
+.ch-grid { stroke: var(--line); stroke-width: 1; }
+.ch-line { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+.ch-area { fill: var(--accent-soft); }
+.ch-dot { fill: var(--accent); stroke: var(--surface); stroke-width: 3; }
+.ch-txt { font-family: var(--mono); font-size: 12px; fill: var(--muted); }
+.ch-ttl { font-family: var(--body); font-size: 12px; fill: var(--muted); font-weight: 600; }
+.ch-cur { font-family: var(--mono); font-size: 13px; fill: var(--ink); font-weight: 500; }
+.insights { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.solver-box { font-family: var(--mono); font-size: 0.84rem; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.solver-box b { font-family: var(--body); }
+
+/* Article-style formulation */
+.model { display: flex; flex-direction: column; gap: 2px; }
+.model.boxed { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+.mlabel { font-weight: 700; margin: 10px 0 2px; }
+.mlabel:first-child { margin-top: 0; }
+.mrow { display: grid; grid-template-columns: minmax(0, 1fr) 3.2em; align-items: center; gap: 8px; }
+.mx { overflow-x: auto; overflow-y: hidden; }
+.mx mjx-container[display="true"] { margin: 0.35em 0 !important; }
+.mno { text-align: right; font-variant-numeric: tabular-nums; }
+.ex { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); }
+table.notation { font-size: 0.9rem; }
+table.notation caption { caption-side: top; text-align: left; padding-bottom: 6px; font-size: 0.9rem; }
+table.notation thead th { border-top: 2px solid var(--ink); border-bottom: 1px solid var(--ink); text-transform: none; letter-spacing: 0; font-size: 0.85rem; color: var(--ink); }
+table.notation th[scope="rowgroup"] { font-weight: 400; color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 0.9rem; white-space: nowrap; vertical-align: top; }
+table.notation td { border-bottom: 0; padding: 3px 9px; }
+table.notation td:last-child { font-style: italic; }
+table.notation tr.grp-start > * { border-top: 1px solid var(--line); padding-top: 8px; }
+table.notation tbody tr:last-child > * { border-bottom: 2px solid var(--ink); padding-bottom: 8px; }
+table.notation th[scope="rowgroup"] { border-bottom: 0; }
+.prose p { max-width: none; }
+#formulation > .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.model.boxed .mx { font-size: 0.86em; }
+
+/* Worked examples under each equation */
+details.exq { margin: 0 0 8px 0; border-left: 3px solid var(--accent); background: var(--bg); border-radius: 0 8px 8px 0; }
+details.exq summary { cursor: pointer; padding: 4px 12px; font-size: 0.85rem; font-weight: 600; color: var(--accent); width: fit-content; }
+details.exq[open] summary { padding-bottom: 2px; }
+.exbody { padding: 4px 14px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 0.93rem; }
+.exbody p { max-width: none; }
+.exbody .mx { font-size: 0.92em; }
+.exbody .btns { gap: 6px; }
+.exbody .chip { font-size: 0.8rem; padding: 2px 10px; }
+.exbody select { font: inherit; font-size: 0.85rem; padding: 3px 6px; border: 1px solid var(--ink); border-radius: 6px; background: var(--surface); color: var(--ink); width: fit-content; }
+.exlbl { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+.badge { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
+.badge.bind { background: var(--cap-soft); color: var(--cap); }
+.badge.slack { background: var(--accent-soft); color: var(--accent); }
+.exrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Problem type stage */
+.checks { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.muted { color: var(--muted); }
+.nt { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-family: var(--display); font-weight: 800; font-size: 0.75rem; margin-right: 6px; vertical-align: -5px; }
+.nt-s { background: var(--accent); color: #fff; }
+.nt-t { border: 2px solid var(--ink); border-radius: 5px; color: var(--ink); }
+.nt-d { background: var(--ink); color: var(--bg); }
+table.nodetypes td:first-child { white-space: nowrap; font-weight: 600; }
+.family { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fam { margin: 0; border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+.fam.here { border-color: var(--accent); border-width: 2px; }
+.fam svg { width: 100%; height: auto; display: block; }
+.fam-arcs line { stroke: var(--muted); stroke-width: 1.5; }
+.fn-s { fill: var(--accent); } .fn-d { fill: var(--ink); } .fn-t { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
+.fam figcaption { font-size: 0.88rem; color: var(--muted); }
+.fam figcaption b { display: block; color: var(--ink); font-size: 0.95rem; }
+.tile .s:only-of-type { color: var(--ink); }
+@media (max-width: 560px) { .family { grid-template-columns: 1fr; } }
+
+.pager { display: none; }
+
+/* Presenter mode */
+body.presenter { font-size: 1.2rem; }
+body.presenter .study-only { display: none !important; }
+body.presenter .stage { display: none; border: 0; background: transparent; padding: 8px 0; min-height: calc(100vh - 150px); }
+body.presenter .stage.active { display: flex; }
+body.presenter main { max-width: 1400px; padding-top: 16px; }
+body.presenter h2 { font-size: 2.4rem; }
+body.presenter .lede { font-size: 1.3rem; }
+body.presenter .pager { display: flex; position: fixed; right: 20px; bottom: 18px; gap: 8px; z-index: 11; }
+body.presenter .pager button { border: 1px solid var(--ink); background: var(--surface); border-radius: 10px; padding: 8px 16px; cursor: pointer; font-weight: 600; }
+body.presenter .pager span { align-self: center; font-family: var(--mono); color: var(--muted); padding: 0 8px; }
+body.presenter .math { font-size: 1.35rem; }
+body.presenter .mx { font-size: 1.15em; }
+body:not(.presenter) .presenter-only { display: none !important; }
+
+@media (max-width: 860px) {
+  .cols { grid-template-columns: 1fr; }
+  .eq { grid-template-columns: 1fr; }
+  .stage { padding: 20px 16px; }
+  h2 { font-size: 1.45rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .arc, .lbl { transition: opacity 0.2s, stroke 0.2s; }
+}
+
+
+#dataTable th[scope="row"] { text-transform: none; color: var(--ink); white-space: nowrap; }
+.open-dot { fill: var(--surface); stroke: var(--accent); stroke-width: 3; }
+.g-lab { font-family: var(--body); font-weight: 600; font-size: 15px; fill: var(--ink); }
+.seg-s { fill: var(--accent); } .seg-j { fill: var(--ink); }
+.seg-t { font-family: var(--mono); font-size: 12px; fill: #fff; }
+.rule { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; font-size: 0.93rem; }
+.rule input { accent-color: var(--accent); width: 18px; height: 18px; }
+
+
+.modnav { max-width: 1180px; margin: 0 auto 40px; padding: 16px 20px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; border-top: 1px solid var(--line); font-size: 0.9rem; }
+.modnav b { font-family: var(--display); margin-right: 6px; }
+.modnav a { color: var(--ink); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; }
+.modnav a:hover { border-color: var(--ink); }
+.modnav a[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+body.presenter .modnav { display: none; }
+.here-row td { background: var(--accent-soft); }
+
+</style>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script src="assets/tex-svg.js" async></script>
+</head>
+<body>
+<header class="bar">
+  <div class="bar-inner">
+    <h1>Fixed-cost models · <span>Great Threads</span></h1>
+    <nav class="stages" id="stageNav" aria-label="Stages"></nav>
+    <div class="mode" role="group" aria-label="View mode">
+      <button id="modeStudy" type="button" aria-pressed="true">Study</button>
+      <button id="modePresent" type="button" aria-pressed="false">Presenter</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+
+<!-- 0 -->
+<section class="stage" id="type" data-title="Problem type">
+  <div class="stage-head"><span class="stage-no">00</span><h2>Problem type: fixed-cost (fixed-charge) models</h2></div>
+  <p class="lede">A fixed-cost model has an activity that costs a lump sum as soon as you do any of it, whatever the amount: renting a machine, opening a line, running a delivery route. That jump makes the cost nonlinear. A binary variable for "do it or not", linked to the amount by a big-M constraint, turns the model back into a linear integer model that Solver can solve reliably.</p>
+  <div class="cols">
+    <div class="stack">
+      <h3>How to recognise one</h3>
+      <ul class="checks">
+        <li>An activity has a <b>cost per unit</b> plus a <b>one-off cost</b> if it happens at all.</li>
+        <li>The one-off cost is <b>zero</b> if the activity is not used.</li>
+        <li>You must choose <b>which activities to run</b> and <b>how much of each</b>.</li>
+        <li>Shared <b>resources</b> (labour, material) limit the amounts.</li>
+      </ul>
+      <div class="note">
+        <h3>The key modelling idea: link the amount to a 0/1 switch</h3>
+        <p>For each product, a binary \(Y_p\) says whether its machine is rented. The constraint \(X_p \le M_p Y_p\) says: if \(Y_p = 0\), nothing can be made; if \(Y_p = 1\), up to \(M_p\) can be made. The fixed cost is then simply \(F_p Y_p\).</p>
+      </div>
+    </div>
+    <div class="stack">
+      <h3>Where fixed-cost models appear</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Setting</th><th>Fixed cost</th><th>Variable amount</th></tr></thead>
+          <tbody>
+            <tr class="here-row"><td><b>Product mix</b> <span class="tag">This exercise</span></td><td>Machine rental per product</td><td>Units made</td></tr>
+            <tr><td>Facility location</td><td>Opening a warehouse</td><td>Goods shipped through it</td></tr>
+            <tr><td>Transport</td><td>Using a lorry or route</td><td>Load carried</td></tr>
+            <tr><td>Batch production</td><td>Set-up of a run</td><td>Batch size</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Common extension</th><th>What changes in the model</th></tr></thead>
+          <tbody>
+            <tr><td>Minimum batch if used</td><td>\(X_p \ge L_p Y_p\) as well as \(X_p \le M_p Y_p\)</td></tr>
+            <tr><td>Limit on product lines</td><td>\(\sum_p Y_p \le k\) or \(\ge k\)</td></tr>
+            <tr><td>Product dependencies</td><td>\(Y_p \le Y_q\): make \(p\) only if \(q\) is made</td></tr>
+            <tr><td>Whole units only</td><td>\(X_p\) integer as well</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="tiles">
+    <div class="tile"><span class="k">Avoid IF</span><span class="s">Writing the fixed cost with IF makes the model nonsmooth. Solver may stop at a poor answer (stage 02).</span></div>
+    <div class="tile"><span class="k">Mixed integer</span><span class="s">Binary switches with continuous amounts make a mixed integer program, solved by branch and bound.</span></div>
+    <div class="tile"><span class="k">Choose M carefully</span><span class="s">M must be large enough never to cut off a good plan, but not needlessly large (stage 06).</span></div>
+    <div class="tile"><span class="k">Fewer, bigger lines</span><span class="s">Fixed costs push the optimum towards making a few products in volume.</span></div>
+  </div>
+  <div class="stack study-only">
+    <h3>Check yourself: is it a fixed-cost model?</h3>
+    <details class="q"><summary>A bakery pays £400 a day to run its croissant line, plus 20p per croissant, and decides how many to bake.</summary><p>Yes. The £400 is incurred only if any croissants are baked: a fixed charge with a variable amount.</p></details>
+    <details class="q"><summary>Tatham picks which of seven projects to fund within a budget.</summary><p>Not quite. There is a binary choice, but no variable amount to link to it: each project is simply in or out. It is a capital budgeting (knapsack) model.</p></details>
+    <details class="q"><summary>A retailer opens warehouses, each with an annual cost, and decides how much to ship through each.</summary><p>Yes. Opening cost is fixed; shipments are variable and only possible through open warehouses: \(X \le M Y\) again.</p></details>
+  </div>
+</section>
+
+<!-- 1 -->
+<section class="stage" id="problem" data-title="Problem">
+  <div class="stage-head"><span class="stage-no">01</span><h2>Choosing clothing lines at Great Threads</h2></div>
+  <p class="lede">Great Threads can make five types of clothing. Each needs its own machinery, rented weekly at a fixed rate. There are 4,000 labour hours and 4,500 square yards of cloth a week. Which products should it make, and how many, to maximise weekly profit?</p>
+  <div class="cols">
+    <div class="tbl-wrap"><table id="dataTable" aria-label="Product data"></table></div>
+    <div class="stack">
+      <div class="tiles">
+        <div class="tile"><span class="k">Labour</span><span class="v">4,000 h</span><span class="s">per week</span></div>
+        <div class="tile"><span class="k">Cloth</span><span class="v">4,500 yd²</span><span class="s">per week</span></div>
+        <div class="tile"><span class="k">Rent all five</span><span class="v">$7,400</span><span class="s">a week in fixed costs</span></div>
+      </div>
+      <details class="q study-only"><summary>Predict first: jackets earn the most per unit. Should Great Threads make only jackets?</summary><p>Jackets earn $75 each but need 8 labour hours, so labour allows only 500 a week: $37,500 less $1,600 rent. Shorts earn $30 per labour hour against jackets' $9.38. Stage 05 shows the best mix uses both.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="stage" id="why" data-title="Why binaries">
+  <div class="stage-head"><span class="stage-no">02</span><h2>Why a fixed cost breaks an ordinary LP</h2></div>
+  <p class="lede">Profit from one product, as a function of how many are made. Choose a product.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="btns" role="group" aria-label="Choose product" id="fcPick"></div>
+      <div class="chart"><svg id="fcChart" viewBox="0 0 560 260" role="img" aria-label="Profit against units made"></svg></div>
+    </div>
+    <div class="stack">
+      <div class="note"><h3>A jump at zero</h3><p>Making nothing earns $0. Making one unit earns the margin minus the whole rental. The line jumps at zero, so profit is not proportional to the amount made, and an LP cannot represent it.</p></div>
+      <div class="note study-only"><h3>What happens with IF functions</h3><p>The workbook's "Using IF Function" sheet sets Rent = IF(Units &gt; 0, 1, 0). GRG Nonlinear then stopped at a plan making 1,000 skirts for $36,900, far below the true optimum of $54,614. With jumps in the model, Solver cannot see which direction improves profit.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="stage" id="formulation" data-title="Formulation">
+  <div class="stage-head"><span class="stage-no">03</span><h2>Model formulation</h2></div>
+  <p class="lede">The model formulation uses the notation in the table. Constraints (3) link the amounts to the binary rental decisions.</p>
+  <div class="cols">
+    <div class="model">
+      <p class="mlabel">Objective function:</p>
+      <div class="mrow"><div class="mx">\[\max \sum_{p\in P} (S_p - V_p) X_p - \sum_{p\in P} F_p Y_p\]</div><span class="mno">(1)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex1"></div></details>
+      <p class="mlabel">Subject to:</p>
+      <div class="mrow"><div class="mx">\[\sum_{p\in P} A_{rp} X_p \;\le\; B_r \qquad \forall r \in R\]</div><span class="mno">(2)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex2"></div></details>
+      <div class="mrow"><div class="mx">\[X_p \;\le\; M_p Y_p \qquad \forall p \in P\]</div><span class="mno">(3)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex3"></div></details>
+      <div class="mrow"><div class="mx">\[X_p \ge 0, \quad Y_p \in \{0,1\} \qquad \forall p \in P\]</div><span class="mno">(4)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex4"></div></details>
+    </div>
+    <div class="stack">
+      <div class="tbl-wrap">
+        <table class="notation" aria-label="Model notation table">
+          <caption><b>Table 1.</b> Model notation table.</caption>
+          <thead><tr><th></th><th>Notation</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><th scope="rowgroup" rowspan="2">Sets</th><td>\(P\)</td><td>Set of products, indexed by \(p\): shirts, shorts, pants, skirts, jackets</td></tr>
+            <tr><td>\(R\)</td><td>Set of resources, indexed by \(r\): labour hours, cloth</td></tr>
+            <tr class="grp-start"><th scope="rowgroup" rowspan="5">Parameters</th><td>\(S_p, V_p\)</td><td>Selling price and variable cost per unit of product \(p \in P\) ($)</td></tr>
+            <tr><td>\(F_p\)</td><td>Weekly rental (fixed cost) of the machinery for product \(p \in P\) ($)</td></tr>
+            <tr><td>\(A_{rp}\)</td><td>Amount of resource \(r \in R\) used per unit of product \(p \in P\)</td></tr>
+            <tr><td>\(B_r\)</td><td>Amount of resource \(r \in R\) available per week</td></tr>
+            <tr><td>\(M_p\)</td><td>Most units of product \(p\) that could be made, \(M_p = \min_r B_r / A_{rp}\)</td></tr>
+            <tr class="grp-start"><th scope="rowgroup" rowspan="2">Decision variables</th><td>\(X_p\)</td><td>Units of product \(p \in P\) made per week</td></tr>
+            <tr><td>\(Y_p\)</td><td>1 if the machinery for product \(p \in P\) is rented, 0 otherwise</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tiles">
+        <div class="tile"><span class="k">Variables</span><span class="v">10</span><span class="s">5 amounts + 5 binaries</span></div>
+        <div class="tile"><span class="k">Constraints</span><span class="v">7</span><span class="s">2 resources + 5 links</span></div>
+        <div class="tile"><span class="k">Model type</span><span class="v">MIP</span><span class="s">mixed integer</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="prose study-only">
+    <p>The objective (1) maximises weekly profit: the contribution of each unit made, minus the rental for every product whose machinery is rented. Constraints (2) ensure that labour hours and cloth used do not exceed what is available. Constraints (3) link production to rental: a product can only be made if its machinery is rented, and then no more than \(M_p\) units. Constraints (4) keep amounts non-negative and make each rental decision a yes or no.</p>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="stage" id="excel" data-title="Excel ↔ maths">
+  <div class="stage-head"><span class="stage-no">04</span><h2>From the spreadsheet to the maths</h2></div>
+  <p class="lede">In <i>Fixed Cost Manufacturing Finished.xlsx</i>, the "effective capacity" row is \(M_p Y_p\).</p>
+  <div class="cols">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Range name</th><th>Cells</th><th>Formula</th><th>In the maths</th></tr></thead>
+        <tbody>
+          <tr><td>Input rows</td><td class="mono">B5:F10</td><td>inputs</td><td>\(A_{rp}\), \(S_p\), \(V_p\), \(F_p\)</td></tr>
+          <tr><td><b>Rent_equipment</b></td><td class="mono">B14:F14</td><td>changing cells, binary</td><td>\(Y_p\)</td></tr>
+          <tr><td><b>Units_produced</b></td><td class="mono">B16:F16</td><td>changing cells</td><td>\(X_p\)</td></tr>
+          <tr><td>Effective_capacity</td><td class="mono">B18:F18</td><td><code>=B14*MIN($D$22/B5,$D$23/B6)</code></td><td>\(M_p Y_p\), right side of (3)</td></tr>
+          <tr><td>Resource_used</td><td class="mono">B22:B23</td><td><code>=SUMPRODUCT(B5:F5,Units_produced)</code></td><td>left side of (2)</td></tr>
+          <tr><td>Resource_available</td><td class="mono">D22:D23</td><td>inputs</td><td>\(B_r\)</td></tr>
+          <tr><td>Revenue, variable cost, fixed cost</td><td class="mono">B26:B28</td><td><code>=SUMPRODUCT(B10:F10,Rent_equipment)</code> etc.</td><td>terms of (1)</td></tr>
+          <tr><td><b>Profit</b></td><td class="mono">B29</td><td><code>=B26-B27-B28</code></td><td>objective (1)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="stack">
+      <div class="solver-box" aria-label="Solver settings">
+        <b>Solver settings</b>
+        <span>Set objective: Profit &nbsp;→ Max</span>
+        <span>By changing: Rent_equipment, Units_produced</span>
+        <span>Subject to:</span>
+        <span>&nbsp; Rent_equipment = binary</span>
+        <span>&nbsp; Units_produced &lt;= Effective_capacity</span>
+        <span>&nbsp; Resource_used &lt;= Resource_available</span>
+        <span>Make unconstrained variables non-negative ✓</span>
+        <span>Method: Simplex LP</span>
+      </div>
+      <div class="note study-only"><h3>Other sheets in the workbook</h3><p>"Illegal Solution" shows a plan that makes pants without renting their machinery: exactly what constraint (3) rules out. "Extra Constraint" requires at least three machines (stage 07). "Using IF Function" is the unreliable nonsmooth version (stage 02).</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="stage" id="solution" data-title="Optimal plan">
+  <div class="stage-head"><span class="stage-no">05</span><h2>The optimal plan earns $54,614 a week</h2></div>
+  <p class="lede">Rent machinery for shorts and jackets only. Both labour and cloth are used up.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="tbl-wrap"><table id="plan5"></table></div>
+      <div class="chart"><svg id="resChart" viewBox="0 0 560 140" role="img" aria-label="Resource use"></svg></div>
+    </div>
+    <div class="stack">
+      <div class="btns" role="group" aria-label="Highlight a story" id="story5">
+        <button class="chip" type="button" data-s="0" aria-pressed="false">Why only two products?</button>
+        <button class="chip" type="button" data-s="1" aria-pressed="false">Why shorts and jackets?</button>
+        <button class="chip" type="button" data-s="2" aria-pressed="false">965.5 pairs of shorts?</button>
+      </div>
+      <p id="storyText" style="font-size:0.98rem">Select a question above.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="stage" id="bigm" data-title="Choosing M">
+  <div class="stage-head"><span class="stage-no">06</span><h2>How big should M be?</h2></div>
+  <p class="lede">Replace each product's \(M_p\) by one common value and re-solve.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="ctrl">
+        <label for="mS">Common value of M <output id="mO" for="mS">2,000</output></label>
+        <input type="range" id="mS" min="100" max="10000" step="50" value="2000">
+        <div class="ticks"><span>100</span><span>966</span><span>5,000</span><span>10,000</span></div>
+      </div>
+      <div class="tiles">
+        <div class="tile hot"><span class="k">Best profit</span><span class="v" id="mProfit">54,614</span><span class="s" id="mStat">$ a week</span></div>
+        <div class="tile"><span class="k">LP relaxation bound</span><span class="v" id="mBound">57,060</span><span class="s">$ if binaries could be fractions</span></div>
+      </div>
+    </div>
+    <div class="stack">
+      <div class="note"><h3>Too small cuts off good plans</h3><p>M is a cap on production. Below 965.5 it stops Great Threads making the 965.5 pairs of shorts the best plan needs, so profit falls. That is a modelling error, not a real limit.</p></div>
+      <div class="note"><h3>Too big makes Solver work harder</h3><p>Any M above 965.5 gives the right answer, but a larger M lets the LP relaxation pretend a machine is "slightly rented" (for example \(Y = 0.05\)) and pay only 5% of its rent. The bound gets weaker and branch and bound has more to search. The workbook's choice, the most each product could ever use, is as tight as possible.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section class="stage" id="whatif" data-title="What if">
+  <div class="stage-head"><span class="stage-no">07</span><h2>What if prices or rules change?</h2></div>
+  <p class="lede">The skirt price slider reproduces the SolverTable sheet. The rules reproduce and extend the "Extra Constraint" sheet.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="ctrl">
+        <label for="skS">Selling price of skirts <output id="skO" for="skS">$70</output></label>
+        <input type="range" id="skS" min="70" max="100" step="1" value="70">
+        <div class="ticks"><span>$70</span><span>$85</span><span>$100</span></div>
+      </div>
+      <label class="rule"><input type="checkbox" id="min3"><span><b>Rent at least three machines.</b> \(\sum_p Y_p \ge 3\)</span></label>
+      <label class="rule"><input type="checkbox" id="minp"><span><b>Make at least 50 of any product rented.</b> \(X_p \ge 50\,Y_p\)</span></label>
+      <div class="tbl-wrap"><table id="plan7"></table></div>
+    </div>
+    <div class="stack">
+      <div class="tiles"><div class="tile hot"><span class="k">Profit</span><span class="v" id="wProfit">54,614</span><span class="s">$ a week</span></div></div>
+      <details class="q study-only"><summary>Why does the plan switch completely at about $87?</summary><p>Skirts alone use all the cloth at 1,000 units: profit 1,000 × (price − 30) − 1,500. That beats $54,614 once the price passes $86.11. Because rentals are all or nothing, the best plan jumps from shorts and jackets to skirts only, with nothing in between.</p></details>
+      <details class="q study-only"><summary>With "at least three machines", why is the third one idle?</summary><p>The rule only says three machines must be rented, not used. The cheapest way to obey it is to rent a $1,500 machine and make nothing with it. To force real production, add a minimum amount for each product rented, as in the second rule.</p></details>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer class="modnav" aria-label="Advanced optimisation models"><b><a class="home" href="index.html">Advanced optimisation models</a></b><a href="investment.html">14.6 Investment strategy</a><a href="pension.html">14.7 Pension fund</a><a href="capital.html">14.8 Capital budgeting</a><a href="fixedcost.html" aria-current="page">14.9 Fixed-cost models</a><a href="hubs.html">14.10 Hub location</a><a href="electricity.html">14.11 Electricity pricing</a><a href="portfolio.html">14.12 Portfolio selection</a></footer>
+<div class="pager" aria-label="Presenter navigation">
+  <button type="button" id="prevBtn">← Back</button>
+  <span id="pageNo">1 / 1</span>
+  <button type="button" id="nextBtn">Next →</button>
+</div>
+<script>
+// Two-phase dense simplex with Bland's rule. Minimise c.x subject to rows, x >= 0.
+// rows: [{a:[...], sense:'<='|'>='|'=', b:number}]
+function solveLP(c, rows) {
+  const EPS = 1e-9;
+  const n = c.length;
+  const m = rows.length;
+  const R = rows.map(r => {
+    if (r.b < 0) return { a: r.a.map(v => -v), b: -r.b, sense: r.sense === '<=' ? '>=' : r.sense === '>=' ? '<=' : '=' };
+    return { a: r.a.slice(), b: r.b, sense: r.sense };
+  });
+  let nSlack = 0, nArt = 0;
+  R.forEach(r => { if (r.sense !== '=') nSlack++; if (r.sense !== '<=') nArt++; });
+  const N = n + nSlack + nArt;
+  const T = [];
+  const basis = [];
+  let si = n, ai = n + nSlack;
+  const artCols = [];
+  R.forEach(r => {
+    const row = new Float64Array(N + 1);
+    for (let j = 0; j < n; j++) row[j] = r.a[j];
+    if (r.sense === '<=') { row[si] = 1; basis.push(si); si++; }
+    else if (r.sense === '>=') { row[si] = -1; si++; row[ai] = 1; basis.push(ai); artCols.push(ai); ai++; }
+    else { row[ai] = 1; basis.push(ai); artCols.push(ai); ai++; }
+    row[N] = r.b;
+    T.push(row);
+  });
+  const isArt = new Uint8Array(N);
+  artCols.forEach(j => isArt[j] = 1);
+
+  function pivot(pr, pc) {
+    const prow = T[pr];
+    const pv = prow[pc];
+    for (let j = 0; j <= N; j++) prow[j] /= pv;
+    for (let i = 0; i < m; i++) {
+      if (i === pr) continue;
+      const f = T[i][pc];
+      if (Math.abs(f) > EPS) { const row = T[i]; for (let j = 0; j <= N; j++) row[j] -= f * prow[j]; }
+    }
+    basis[pr] = pc;
+  }
+  function run(cost, allowed) {
+    for (let iter = 0; iter < 5000; iter++) {
+      // reduced costs
+      let enter = -1;
+      for (let j = 0; j < N; j++) {
+        if (!allowed(j)) continue;
+        let rc = cost[j];
+        for (let i = 0; i < m; i++) rc -= cost[basis[i]] * T[i][j];
+        if (rc < -EPS) { enter = j; break; } // Bland
+      }
+      if (enter < 0) return 'optimal';
+      let leave = -1, best = Infinity;
+      for (let i = 0; i < m; i++) {
+        const a = T[i][enter];
+        if (a > EPS) {
+          const r = T[i][N] / a;
+          if (r < best - EPS || (Math.abs(r - best) <= EPS && basis[i] < basis[leave])) { best = r; leave = i; }
+        }
+      }
+      if (leave < 0) return 'unbounded';
+      pivot(leave, enter);
+    }
+    return 'iterlimit';
+  }
+  // Phase 1
+  const c1 = new Float64Array(N); artCols.forEach(j => c1[j] = 1);
+  run(c1, () => true);
+  let infeas = 0;
+  for (let i = 0; i < m; i++) if (isArt[basis[i]]) infeas += T[i][N];
+  if (infeas > 1e-7) return { status: 'infeasible' };
+  // drive remaining artificials out of basis
+  for (let i = 0; i < m; i++) {
+    if (!isArt[basis[i]]) continue;
+    for (let j = 0; j < n + nSlack; j++) if (Math.abs(T[i][j]) > 1e-9) { pivot(i, j); break; }
+  }
+  // Phase 2
+  const c2 = new Float64Array(N); for (let j = 0; j < n; j++) c2[j] = c[j];
+  const st = run(c2, j => !isArt[j]);
+  if (st !== 'optimal') return { status: st };
+  const x = new Array(n).fill(0);
+  for (let i = 0; i < m; i++) if (basis[i] < n) x[basis[i]] = T[i][N];
+  let z = 0; for (let j = 0; j < n; j++) z += c[j] * x[j];
+  return { status: 'optimal', x, z };
+}
+
+
+// Branch and bound on top of solveLP. ints = indices that must be whole numbers.
+function solveMILP(c, rows, ints) {
+  let best = null, nodes = 0;
+  const stack = [[]];
+  while (stack.length && nodes < 20000) {
+    const extra = stack.pop(); nodes++;
+    const r = solveLP(c, rows.concat(extra));
+    if (r.status !== 'optimal') continue;
+    if (best && r.z >= best.z - 1e-7) continue;
+    let k = -1, worst = 1e-6;
+    for (const j of ints) { const f = Math.abs(r.x[j] - Math.round(r.x[j])); if (f > worst) { worst = f; k = j; } }
+    if (k < 0) { r.x = r.x.map((v, j) => ints.includes(j) ? Math.round(v) : v); best = r; continue; }
+    const lo = new Array(c.length).fill(0); lo[k] = 1;
+    stack.push(extra.concat([{ a: lo, sense: '>=', b: Math.ceil(r.x[k]) }]));
+    stack.push(extra.concat([{ a: lo.slice(), sense: '<=', b: Math.floor(r.x[k]) }]));
+  }
+  return best ? Object.assign(best, { nodes }) : { status: 'infeasible', nodes };
+}
+const row = (n, terms, sense, b) => { const a = new Array(n).fill(0); for (const [j, v] of terms) a[j] += v; return { a, sense, b }; };
+const SVGNS = 'http://www.w3.org/2000/svg';
+const fmt = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString('en-GB', { maximumFractionDigits: d });
+const key = a => a[0] + '-' + a[1];
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+const tnum = (v, d = 2) => fmt(v, d).replace(/,/g, '{,}');
+const cap1 = s => s.replace(/^./, c => c.toUpperCase());
+function typeset(elm) {
+  if (window.MathJax && MathJax.typesetPromise) { try { MathJax.typesetClear([elm]); } catch (e) {} MathJax.typesetPromise([elm]).catch(() => {}); }
+}
+function badge(lhs, rhs, sense, unit) {
+  const gap = sense === '<=' ? rhs - lhs : sense === '>=' ? lhs - rhs : 0;
+  if (Math.abs(gap) < 1e-6) return '<span class="badge bind">binding: no room to spare</span>';
+  return `<span class="badge slack">slack: ${fmt(gap)}${unit ? ' ' + unit : ''} to spare</span>`;
+}
+function chipRow(opts, sel, attr) {
+  return '<div class="btns" role="group" aria-label="Choose an example">' + opts.map(([v, label]) =>
+    `<button type="button" class="chip" ${attr}="${v}" aria-pressed="${String(sel) === String(v)}">${label}</button>`).join('') + '</div>';
+}
+// Worked examples: EX[n] = () => html; chips use data-exv, handler sets EXSEL[n]
+const EX = {}, EXSEL = {};
+function renderEx(n) {
+  const elm = document.getElementById('ex' + n); if (!elm) return;
+  elm.innerHTML = EX[n]();
+  elm.querySelectorAll('[data-exv]').forEach(b => b.addEventListener('click', () => { EXSEL[n] = b.dataset.exv; renderEx(n); }));
+  elm.querySelectorAll('select[data-exsel]').forEach(s => s.addEventListener('change', () => { EXSEL[n] = s.value; renderEx(n); }));
+  typeset(elm);
+}
+function renderAllEx() { Object.keys(EX).forEach(n => renderEx(n)); }
+// ---------- Line chart ----------
+function drawChart(svg, pts, cur, o) {
+  svg.innerHTML = '';
+  const W = 560, H = 250, L = 62, R = 18, T = 30, B = 42;
+  const xs = pts.map(p => p.x), ys = pts.filter(p => p.y != null).map(p => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const lo0 = o.fit ? Math.min(...ys) : 0, rawStep = (Math.max(...ys) - lo0) / 4 || Math.max(...ys) / 4 || 1, mag = 10 ** Math.floor(Math.log10(rawStep));
+  const ystep = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= rawStep);
+  const yMin = o.fit ? Math.floor(lo0 / ystep) * ystep : 0, yMax = Math.max(yMin + ystep, Math.ceil(Math.max(...ys) / ystep) * ystep);
+  const sx = v => L + (v - x0) / (x1 - x0) * (W - L - R);
+  const sy = v => H - B - (v - yMin) / (yMax - yMin) * (H - T - B);
+  for (let v = yMin; v <= yMax + 1e-9; v += ystep) {
+    el('line', { x1: L, x2: W - R, y1: sy(v), y2: sy(v), class: 'ch-grid' }, svg);
+    el('text', { x: L - 8, y: sy(v) + 4, 'text-anchor': 'end', class: 'ch-txt' }, svg).textContent = fmt(v, 0);
+  }
+  o.xTicks.forEach(v => {
+    el('text', { x: sx(v), y: H - B + 18, 'text-anchor': 'middle', class: 'ch-txt' }, svg).textContent = o.xFmt(v);
+  });
+  el('line', { x1: L, x2: W - R, y1: H - B, y2: H - B, class: 'ch-axis' }, svg);
+  el('text', { x: L, y: 16, class: 'ch-ttl' }, svg).textContent = o.yLabel;
+  el('text', { x: W - R, y: H - 4, 'text-anchor': 'end', class: 'ch-ttl' }, svg).textContent = o.xLabel;
+  const ok = pts.filter(p => p.y != null);
+  const line = ok.map((p, i) => (i ? 'L' : 'M') + sx(p.x).toFixed(1) + ',' + sy(p.y).toFixed(1)).join(' ');
+  el('path', { d: line + ` L${sx(ok[ok.length - 1].x)},${sy(yMin)} L${sx(ok[0].x)},${sy(yMin)} Z`, class: 'ch-area' }, svg);
+  el('path', { d: line, class: 'ch-line' }, svg);
+  const c = pts.find(p => Math.abs(p.x - cur) < 1e-9);
+  if (c && c.y != null) {
+    el('line', { x1: sx(c.x), x2: sx(c.x), y1: sy(c.y), y2: H - B, class: 'ch-grid', 'stroke-dasharray': '3 3' }, svg);
+    el('circle', { cx: sx(c.x), cy: sy(c.y), r: 6, class: 'ch-dot' }, svg);
+    const right = sx(c.x) > W - 130;
+    const yfmt = o.yFmt || (v => fmt(v, 1));
+    el('text', { x: sx(c.x) + (right ? -12 : 12), y: sy(c.y) - 10, 'text-anchor': right ? 'end' : 'start', class: 'ch-cur' }, svg).textContent = yfmt(c.y);
+  }
+}
+
+function initNav() {
+const stages = [...document.querySelectorAll('.stage')];
+const nav = document.getElementById('stageNav');
+let cur = 0;
+stages.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.textContent = `${s.querySelector('.stage-no').textContent}  ${s.dataset.title}`;
+  b.addEventListener('click', () => go(i, true));
+  nav.appendChild(b);
+});
+function presenter() { return document.body.classList.contains('presenter'); }
+function go(i, scroll) {
+  cur = Math.max(0, Math.min(stages.length - 1, i));
+  stages.forEach((s, k) => s.classList.toggle('active', k === cur));
+  [...nav.children].forEach((b, k) => b.setAttribute('aria-current', k === cur ? 'true' : 'false'));
+  document.getElementById('pageNo').textContent = `${cur + 1} / ${stages.length}`;
+  if (presenter()) window.scrollTo(0, 0);
+  else if (scroll) stages[cur].scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+function setMode(m) {
+  document.body.classList.toggle('presenter', m === 'presenter');
+  document.getElementById('modeStudy').setAttribute('aria-pressed', m === 'study');
+  document.getElementById('modePresent').setAttribute('aria-pressed', m === 'presenter');
+  try { localStorage.setItem('om-mode', m); } catch (e) {}
+  go(cur, m === 'study');
+}
+document.getElementById('modeStudy').addEventListener('click', () => setMode('study'));
+document.getElementById('modePresent').addEventListener('click', () => setMode('presenter'));
+document.getElementById('prevBtn').addEventListener('click', () => go(cur - 1));
+document.getElementById('nextBtn').addEventListener('click', () => go(cur + 1));
+document.addEventListener('keydown', e => {
+  if (!presenter() || e.target.tagName === 'INPUT') return;
+  if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(cur + 1); }
+  if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); go(cur - 1); }
+});
+if ('IntersectionObserver' in window) {
+  const io = new IntersectionObserver(es => {
+    if (presenter()) return;
+    es.forEach(e => { if (e.isIntersecting) { cur = stages.indexOf(e.target); [...nav.children].forEach((b, k) => b.setAttribute('aria-current', k === cur ? 'true' : 'false')); } });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  stages.forEach(s => io.observe(s));
+}
+let saved = 'study';
+try { saved = localStorage.getItem('om-mode') || 'study'; } catch (e) {}
+setMode(saved);
+go(0, false);
+}
+
+// ---------- Small convex QP solver (face enumeration) ----------
+// min 0.5 x'Qx + c'x  s.t. Aeq x = beq, Ain x <= bin. Enumerates active sets; fine for a handful of constraints.
+function linsolve(M, v) {
+  const n = v.length, A = M.map((r, i) => r.concat([v[i]]));
+  for (let k = 0; k < n; k++) {
+    let p = k; for (let i = k + 1; i < n; i++) if (Math.abs(A[i][k]) > Math.abs(A[p][k])) p = i;
+    if (Math.abs(A[p][k]) < 1e-12) return null;
+    [A[k], A[p]] = [A[p], A[k]];
+    for (let i = 0; i < n; i++) if (i !== k) { const f = A[i][k] / A[k][k]; for (let j = k; j <= n; j++) A[i][j] -= f * A[k][j]; }
+  }
+  return A.map((r, i) => r[n] / r[i]);
+}
+function solveQP(Q, c, Aeq, beq, Ain, bin) {
+  const n = c.length, m = Ain.length;
+  let best = null;
+  for (let mask = 0; mask < (1 << m); mask++) {
+    const E = Aeq.slice(), e = beq.slice();
+    for (let k = 0; k < m; k++) if (mask & (1 << k)) { E.push(Ain[k]); e.push(bin[k]); }
+    const q = E.length, N = n + q;
+    if (q > n) continue;
+    const M = [], v = [];
+    for (let i = 0; i < n; i++) { const r = Q[i].slice(); for (let k = 0; k < q; k++) r.push(E[k][i]); M.push(r); v.push(-c[i]); }
+    for (let k = 0; k < q; k++) { M.push(E[k].concat(new Array(q).fill(0))); v.push(e[k]); }
+    const s = linsolve(M, v); if (!s) continue;
+    const x = s.slice(0, n);
+    if (!Ain.every((a, k) => a.reduce((t, aj, j) => t + aj * x[j], 0) <= bin[k] + 1e-7)) continue;
+    let f = 0; for (let i = 0; i < n; i++) { f += c[i] * x[i]; for (let j = 0; j < n; j++) f += 0.5 * x[i] * Q[i][j] * x[j]; }
+    if (!best || f < best.z - 1e-12) best = { status: 'optimal', x, z: f };
+  }
+  return best || { status: 'infeasible' };
+}
+
+
+const PROD = ['Shirts','Shorts','Pants','Skirts','Jackets'];
+const LAB = [2,1,6,4,8], CLO = [3,2.5,4,4.5,5.5], PRICE = [35,40,65,70,110], VC = [20,10,25,30,35], FIX = [1500,1200,1600,1500,1600];
+const MEFF = PROD.map((_, p) => Math.min(4000 / LAB[p], 4500 / CLO[p]));
+// enumerate rentals, LP for amounts
+function solveF(o = {}) {
+  const price = PRICE.slice(); if (o.skirt) price[3] = o.skirt;
+  const m = price.map((s, p) => s - VC[p]);
+  let best = null;
+  for (let mask = 0; mask < 32; mask++) {
+    const y = [0,1,2,3,4].map(p => (mask >> p) & 1);
+    if (o.min3 && y.reduce((a, b) => a + b, 0) < 3) continue;
+    const M = [0,1,2,3,4].map(p => o.M != null ? o.M : MEFF[p]);
+    const rows = [{ a: LAB, sense: '<=', b: 4000 }, { a: CLO, sense: '<=', b: 4500 }];
+    [0,1,2,3,4].forEach(p => { rows.push(row(5, [[p, 1]], '<=', M[p] * y[p])); if (o.minp && y[p]) rows.push(row(5, [[p, 1]], '>=', o.minp)); });
+    const r = solveLP(m.map(v => -v), rows);
+    if (r.status !== 'optimal') continue;
+    const val = -r.z - y.reduce((s, v, p) => s + v * FIX[p], 0);
+    if (!best || val > best.profit + 1e-6) best = { profit: val, y, x: r.x.map(v => Math.abs(v) < 1e-7 ? 0 : v), m };
+  }
+  return best;
+}
+function relax(M) {
+  const c = PRICE.map((s, p) => -(s - VC[p])).concat(FIX);
+  const rows = [{ a: LAB.concat([0,0,0,0,0]), sense: '<=', b: 4000 }, { a: CLO.concat([0,0,0,0,0]), sense: '<=', b: 4500 }];
+  [0,1,2,3,4].forEach(p => { rows.push(row(10, [[p, 1], [5 + p, -M]], '<=', 0)); rows.push(row(10, [[5 + p, 1]], '<=', 1)); });
+  return -solveLP(c, rows).z;
+}
+const base = solveF();
+const money = v => '$' + fmt(v, 0);
+
+// Stage 1
+document.getElementById('dataTable').innerHTML = '<thead><tr><th></th>' + PROD.map(p => `<th class="r">${p}</th>`).join('') + '</tr></thead><tbody>' +
+  [['Labour h / unit', LAB], ['Cloth yd² / unit', CLO], ['Price', PRICE.map(v => '$' + v)], ['Variable cost', VC.map(v => '$' + v)], ['Margin / unit', PRICE.map((s, p) => '$' + (s - VC[p]))], ['Weekly rental', FIX.map(v => '$' + fmt(v, 0))], ['Most possible (\\(M_p\\))', MEFF.map(v => fmt(v, 1))]]
+  .map(([n, a]) => `<tr><th scope="row">${n}</th>${a.map(v => `<td class="r num">${v}</td>`).join('')}</tr>`).join('') + '</tbody>';
+
+// Stage 2
+let fcP = 4;
+function upd2() {
+  const svg = document.getElementById('fcChart'); svg.innerHTML = '';
+  const W = 560, H = 260, L = 64, R = 16, T = 26, Bt = 40, mg = PRICE[fcP] - VC[fcP], be = FIX[fcP] / mg, mx = Math.ceil(be * 3);
+  const yMax = mg * mx - FIX[fcP], yMin = -FIX[fcP] * 1.25;
+  const sx = v => L + v / mx * (W - L - R), sy = v => H - Bt - (v - yMin) / (yMax * 1.15 - yMin) * (H - T - Bt);
+  const step = 1000;
+  for (let v = Math.ceil(yMin / step) * step; v <= yMax * 1.15; v += step) { el('line', { x1: L, x2: W - R, y1: sy(v), y2: sy(v), class: 'ch-grid' }, svg); el('text', { x: L - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'ch-txt' }, svg).textContent = (v < 0 ? '−$' : '$') + fmt(Math.abs(v), 0); }
+  el('line', { x1: sx(be), x2: sx(be), y1: sy(0), y2: H - Bt, class: 'ch-grid', 'stroke-dasharray': '3 3' }, svg);
+  el('text', { x: sx(be) + 6, y: sy(0) + 16, class: 'ch-txt' }, svg).textContent = `break-even: ${fmt(be, 1)} units`;
+  el('line', { x1: L, x2: W - R, y1: sy(0), y2: sy(0), class: 'ch-axis' }, svg);
+  el('line', { x1: sx(0.5), x2: sx(mx), y1: sy(mg * 0.5 - FIX[fcP]), y2: sy(yMax), class: 'ch-line' }, svg);
+  el('circle', { cx: sx(0), cy: sy(0), r: 6, class: 'ch-dot' }, svg);
+  el('circle', { cx: sx(0.5), cy: sy(-FIX[fcP]), r: 6, class: 'open-dot' }, svg);
+  el('text', { x: sx(0) + 14, y: sy(-FIX[fcP]) + 4, class: 'ch-cur' }, svg).textContent = `make 1: $${mg} − $${fmt(FIX[fcP], 0)} rent`;
+  el('text', { x: sx(0) + 12, y: sy(0) - 10, class: 'ch-cur' }, svg).textContent = 'make 0: $0';
+  [0, mx / 2, mx].forEach(v => el('text', { x: sx(v), y: H - Bt + 18, 'text-anchor': 'middle', class: 'ch-txt' }, svg).textContent = fmt(v, 0));
+  el('text', { x: L, y: 14, class: 'ch-ttl' }, svg).textContent = `Weekly profit from ${PROD[fcP].toLowerCase()} alone, first ${mx} units ($)`;
+  el('text', { x: W - R, y: H - 4, 'text-anchor': 'end', class: 'ch-ttl' }, svg).textContent = 'units made';
+  document.querySelectorAll('#fcPick .chip').forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.p === fcP)));
+}
+document.getElementById('fcPick').innerHTML = PROD.map((p, k) => `<button class="chip" type="button" data-p="${k}">${p}</button>`).join('');
+document.querySelectorAll('#fcPick .chip').forEach(b => b.addEventListener('click', () => { fcP = +b.dataset.p; upd2(); }));
+upd2();
+
+// Examples
+const X = base.x, Y = base.y;
+EXSEL[2] = 'lab'; EXSEL[3] = '1'; EXSEL[4] = '0';
+EX[1] = () => `<p>The first sum is the contribution from units made; the second subtracts the rent of every machine rented.</p>
+  <span class="exlbl">Written out</span><div class="mx">\\[\\begin{aligned} & 15X_1 + 30X_2 + 40X_3 + 40X_4 + 75X_5 \\\\ & - 1500Y_1 - 1200Y_2 - 1600Y_3 - 1500Y_4 - 1600Y_5 \\end{aligned}\\]</div>
+  <span class="exlbl">With the optimal plan (stage 05)</span><div class="mx">\\[30(${tnum(X[1], 2)}) + 75(${tnum(X[4], 2)}) - 1200(1) - 1600(1) = ${tnum(base.profit, 2)}\\]</div>`;
+EX[2] = () => { const lab = EXSEL[2] === 'lab', a = lab ? LAB : CLO, B = lab ? 4000 : 4500, used = a.reduce((s, v, p) => s + v * X[p], 0);
+  return chipRow([['lab', 'Labour'], ['clo', 'Cloth']], EXSEL[2], 'data-exv') +
+  `<span class="exlbl">Written out</span><div class="mx">\\[${a.map((v, p) => v + 'X_' + (p + 1)).join(' + ')} \\le ${tnum(B, 0)}\\]</div>
+  <span class="exlbl">With the optimal plan (stage 05)</span><div class="mx">\\[${a[1]}(${tnum(X[1], 2)}) + ${a[4]}(${tnum(X[4], 2)}) = ${tnum(used, 0)} \\le ${tnum(B, 0)}\\]</div>
+  <p>${badge(used, B, '<=', lab ? 'hours' : 'yd²')}</p><p class="ex">Constraint (2) creates 2 constraints, one per resource.</p>`; };
+EX[3] = () => { const p = +EXSEL[3];
+  return chipRow(PROD.map((n, k) => [k, n]), EXSEL[3], 'data-exv') +
+  `<p>\\(M_${p + 1} = \\min(4000/${LAB[p]},\\ 4500/${CLO[p]}) = ${tnum(MEFF[p], 1)}\\): the most ${PROD[p].toLowerCase()} the resources could ever allow.</p>
+  <span class="exlbl">Written out</span><div class="mx">\\[X_${p + 1} \\le ${tnum(MEFF[p], 1)}\\,Y_${p + 1}\\]</div>
+  <span class="exlbl">With the optimal plan (stage 05)</span><div class="mx">\\[${tnum(X[p], 2)} \\le ${tnum(MEFF[p], 1)} \\times ${Y[p]} = ${tnum(MEFF[p] * Y[p], 1)}\\]</div>
+  <p>${Y[p] ? `The machine is rented, so up to ${fmt(MEFF[p], 1)} can be made.` : 'The machine is not rented, so the right side is 0 and nothing can be made.'}</p>
+  <p class="ex">Constraint (3) creates 5 constraints, one per product.</p>`; };
+EX[4] = () => { const p = +EXSEL[4];
+  return chipRow(PROD.map((n, k) => [k, n]), EXSEL[4], 'data-exv') +
+  `<span class="exlbl">With the optimal plan (stage 05)</span><div class="mx">\\[X_${p + 1} = ${tnum(X[p], 2)} \\ge 0, \\qquad Y_${p + 1} = ${Y[p]} \\in \\{0,1\\}\\]</div>
+  <p class="ex">Without the binary restriction, Solver could rent "a fraction" of a machine and pay only part of its rent (stage 06).</p>`; };
+
+// Stage 5
+function planTable(s) {
+  return '<thead><tr><th>Product</th><th class="r">Rent?</th><th class="r">Units</th><th class="r">Contribution</th><th class="r">Rent</th></tr></thead><tbody>' +
+    PROD.map((n, p) => `<tr${s.y[p] ? ' class="here-row"' : ''}><td>${n}</td><td class="r">${s.y[p] ? 'yes' : ''}</td><td class="r num">${s.x[p] ? fmt(s.x[p], 1) : ''}</td><td class="r num">${s.x[p] ? money(s.x[p] * s.m[p]) : ''}</td><td class="r num">${s.y[p] ? money(FIX[p]) : ''}</td></tr>`).join('') +
+    `<tr class="total"><td>Weekly profit</td><td></td><td></td><td></td><td class="r num">${money(s.profit)}</td></tr></tbody>`;
+}
+document.getElementById('plan5').innerHTML = planTable(base);
+(function () {
+  const svg = document.getElementById('resChart'), L = 90, W = 560, w = W - L - 120;
+  [['Labour', LAB, 4000, 'h'], ['Cloth', CLO, 4500, 'yd²']].forEach(([n, a, B, u], k) => {
+    const y = 30 + k * 60; let acc = 0;
+    el('text', { x: 10, y: y + 15, class: 'g-lab' }, svg).textContent = n;
+    [1, 4].forEach((p, j) => { const v = a[p] * X[p]; el('rect', { x: L + acc / B * w, y, width: v / B * w, height: 24, class: j ? 'seg-j' : 'seg-s' }, svg); el('text', { x: L + (acc + v / 2) / B * w, y: y + 16, 'text-anchor': 'middle', class: 'seg-t' }, svg).textContent = `${PROD[p]} ${fmt(v, 0)}`; acc += v; });
+    el('text', { x: L + w + 8, y: y + 16, class: 'ch-cur' }, svg).textContent = `${fmt(acc, 0)} / ${fmt(B, 0)}`;
+  });
+})();
+const STORY = [
+  'Every product line costs $1,200 to $1,600 a week in rent. Spreading the same labour and cloth over more lines would pay more rent for no extra output, so the best plan concentrates on two.',
+  'Shorts earn the most per labour hour ($30) and jackets the most per square yard of cloth ($13.64). Shorts alone run out of cloth after 1,800 units with over half the labour unused; jackets alone run out of labour with cloth to spare. Together they use both resources fully, which no single product can do.',
+  'This LP-based model allows fractions of a garment. Requiring whole units gives 966 shorts and 379 jackets for $54,605, only $9 less, so the fractional plan is a good guide here.'
+];
+document.querySelectorAll('#story5 .chip').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#story5 .chip').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  document.getElementById('storyText').textContent = STORY[+b.dataset.s];
+}));
+
+// Stage 6
+const mS = document.getElementById('mS');
+function upd6() {
+  const M = +mS.value, s = solveF({ M });
+  document.getElementById('mO').textContent = fmt(M, 0);
+  document.getElementById('mProfit').textContent = fmt(s.profit, 0);
+  document.getElementById('mStat').textContent = s.profit < base.profit - 1 ? `$ a week: $${fmt(base.profit - s.profit, 0)} lost because M is too small` : '$ a week: the true optimum';
+  document.getElementById('mBound').textContent = fmt(relax(M), 0);
+}
+mS.addEventListener('input', upd6); upd6();
+
+// Stage 7
+const skS = document.getElementById('skS');
+function upd7() {
+  const s = solveF({ skirt: +skS.value, min3: document.getElementById('min3').checked, minp: document.getElementById('minp').checked ? 50 : 0 });
+  document.getElementById('skO').textContent = '$' + skS.value;
+  document.getElementById('wProfit').textContent = fmt(s.profit, 0);
+  document.getElementById('plan7').innerHTML = planTable(s);
+}
+[skS, document.getElementById('min3'), document.getElementById('minp')].forEach(e => e.addEventListener('input', upd7));
+upd7();
+
+initNav();
+renderAllEx();
+</script>
+</body>
+</html>

@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tatham Capital Budgeting Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  /* Layout: a sticky stage bar over one column of numbered stages; presenter mode shows one stage at a time, large. */
+  --bg: #f4f5f6;
+  --surface: #ffffff;
+  --ink: #18212b;
+  --muted: #5a6570;
+  --line: #d8dde2;
+  --accent: #c9352a;      /* tomato red: plants and product flow */
+  --accent-soft: #f7e3e0;
+  --cap: #b77900;         /* semantic: arc at capacity */
+  --cap-soft: #fbefd6;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161b; --surface: #192027; --ink: #e6eaee; --muted: #9ba6b1; --line: #2d3640;
+    --accent: #ff6b57; --accent-soft: #3a211e; --cap: #f0b43a; --cap-soft: #3a2f17;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161b; --surface: #192027; --ink: #e6eaee; --muted: #9ba6b1; --line: #2d3640;
+  --accent: #ff6b57; --accent-soft: #3a211e; --cap: #f0b43a; --cap-soft: #3a2f17;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.55; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.015em; }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Top bar */
+.bar { position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar-inner { max-width: 1180px; margin: 0 auto; padding: 10px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
+.bar h1 span { color: var(--accent); }
+.stages { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto; }
+.stages button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 3px 11px; font-size: 0.82rem; cursor: pointer; color: var(--muted); }
+.stages button:hover { color: var(--ink); border-color: var(--muted); }
+.stages button[aria-current="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.mode { display: inline-flex; border: 1px solid var(--ink); border-radius: 8px; overflow: hidden; }
+.mode button { border: 0; background: transparent; padding: 5px 13px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
+.mode button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+main { max-width: 1180px; margin: 0 auto; padding: 24px 20px 80px; display: flex; flex-direction: column; gap: 28px; }
+.stage { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 20px; scroll-margin-top: 90px; }
+.stage-head { display: flex; align-items: baseline; gap: 14px; }
+.stage-no { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); font-weight: 500; }
+.lede { font-size: 1.08rem; color: var(--muted); }
+.cols { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+
+/* Study-only material */
+.note { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; display: flex; flex-direction: column; gap: 6px; }
+.note h3 { font-size: 0.95rem; }
+details.q { border: 1px dashed var(--muted); border-radius: 8px; padding: 10px 14px; }
+details.q summary { cursor: pointer; font-weight: 600; }
+details.q summary::marker { color: var(--accent); }
+details.q[open] summary { margin-bottom: 8px; }
+.tag { display: inline-block; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); }
+
+/* Data tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tile { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.tile .k { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.tile .v { font-family: var(--mono); font-size: 1.35rem; font-weight: 500; }
+.tile .s { font-size: 0.85rem; color: var(--muted); }
+.tile.hot { border-color: var(--accent); }
+.tile.hot .v { color: var(--accent); }
+
+/* Network */
+.net-wrap { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow-x: auto; }
+svg.net { display: block; width: 100%; min-width: 560px; height: auto; }
+.arc { fill: none; stroke: var(--line); stroke-width: 1.6; }
+.arc.used { stroke: var(--accent); }
+.arc.cap { stroke: var(--cap); }
+.arc.hl { stroke: var(--ink); stroke-width: 4; }
+.arc.dim { opacity: 0.18; }
+.mk-faint { fill: var(--line); } .mk-used { fill: var(--accent); } .mk-cap { fill: var(--cap); } .mk-hl { fill: var(--ink); }
+.lbl rect { fill: var(--surface); stroke: currentColor; stroke-width: 1.2; }
+.lbl text { font-family: var(--mono); font-size: 15px; font-weight: 500; fill: var(--ink); }
+.lbl.used { color: var(--accent); } .lbl.cap { color: var(--cap); } .lbl.dim { opacity: 0.2; }
+.node-plant { fill: var(--accent); }
+.node-wh { fill: var(--surface); stroke: var(--ink); stroke-width: 2.5; }
+.node-cust { fill: var(--ink); }
+.node-num { font-family: var(--display); font-weight: 800; font-size: 22px; text-anchor: middle; dominant-baseline: central; }
+.node-num.on-plant { fill: #fff; } .node-num.on-wh { fill: var(--ink); } .node-num.on-cust { fill: var(--bg); }
+.cap1 { font-family: var(--body); font-size: 16px; font-weight: 600; fill: var(--ink); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.cap2 { font-family: var(--mono); font-size: 14px; fill: var(--muted); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.85rem; color: var(--muted); padding: 8px 14px; border-top: 1px solid var(--line); }
+.legend i { display: inline-block; width: 22px; height: 0; border-top: 4px solid; vertical-align: middle; margin-right: 6px; }
+.legend .sw { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin-right: 6px; }
+
+/* Tables */
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { padding: 6px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+td.r, th.r { text-align: right; }
+table.matrix td, table.matrix th { text-align: center; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+table.matrix td.has { cursor: pointer; }
+table.matrix td.has:hover, table.matrix td.has.on { background: var(--ink); color: var(--bg); }
+table.matrix td.none { color: var(--line); }
+table.matrix th[scope="row"] { color: var(--ink); }
+.grp { font-size: 0.7rem; color: var(--muted); display: block; font-family: var(--body); font-weight: 400; letter-spacing: 0; text-transform: none; }
+tr.total td { font-weight: 600; border-top: 2px solid var(--ink); border-bottom: 0; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; overflow-wrap: anywhere; }
+
+/* Maths */
+.math { font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif; font-size: 1.12rem; }
+.math i { font-style: italic; }
+.eqs { display: flex; flex-direction: column; gap: 14px; }
+.eq { display: grid; grid-template-columns: 170px 1fr; gap: 6px 18px; align-items: baseline; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.eq:last-child { border-bottom: 0; }
+.eq .name { font-weight: 600; font-size: 0.92rem; }
+.eq .name small { display: block; font-weight: 400; color: var(--muted); }
+.eq .body { display: flex; flex-direction: column; gap: 4px; }
+.eq .ex { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); }
+.net-term { background: var(--accent-soft); border-radius: 4px; padding: 0 4px; }
+.sigma { font-size: 1.3em; vertical-align: -0.12em; }
+
+/* Controls */
+.ctrl { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.ctrl label { font-weight: 600; display: flex; justify-content: space-between; gap: 10px; }
+.ctrl output { font-family: var(--mono); color: var(--accent); font-weight: 500; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.ticks { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--ink); background: transparent; border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 0.88rem; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.chart { border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.chart svg { display: block; width: 100%; height: auto; }
+.ch-axis { stroke: var(--muted); stroke-width: 1; }
+.ch-grid { stroke: var(--line); stroke-width: 1; }
+.ch-line { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+.ch-area { fill: var(--accent-soft); }
+.ch-dot { fill: var(--accent); stroke: var(--surface); stroke-width: 3; }
+.ch-txt { font-family: var(--mono); font-size: 12px; fill: var(--muted); }
+.ch-ttl { font-family: var(--body); font-size: 12px; fill: var(--muted); font-weight: 600; }
+.ch-cur { font-family: var(--mono); font-size: 13px; fill: var(--ink); font-weight: 500; }
+.insights { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.solver-box { font-family: var(--mono); font-size: 0.84rem; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.solver-box b { font-family: var(--body); }
+
+/* Article-style formulation */
+.model { display: flex; flex-direction: column; gap: 2px; }
+.model.boxed { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+.mlabel { font-weight: 700; margin: 10px 0 2px; }
+.mlabel:first-child { margin-top: 0; }
+.mrow { display: grid; grid-template-columns: minmax(0, 1fr) 3.2em; align-items: center; gap: 8px; }
+.mx { overflow-x: auto; overflow-y: hidden; }
+.mx mjx-container[display="true"] { margin: 0.35em 0 !important; }
+.mno { text-align: right; font-variant-numeric: tabular-nums; }
+.ex { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); }
+table.notation { font-size: 0.9rem; }
+table.notation caption { caption-side: top; text-align: left; padding-bottom: 6px; font-size: 0.9rem; }
+table.notation thead th { border-top: 2px solid var(--ink); border-bottom: 1px solid var(--ink); text-transform: none; letter-spacing: 0; font-size: 0.85rem; color: var(--ink); }
+table.notation th[scope="rowgroup"] { font-weight: 400; color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 0.9rem; white-space: nowrap; vertical-align: top; }
+table.notation td { border-bottom: 0; padding: 3px 9px; }
+table.notation td:last-child { font-style: italic; }
+table.notation tr.grp-start > * { border-top: 1px solid var(--line); padding-top: 8px; }
+table.notation tbody tr:last-child > * { border-bottom: 2px solid var(--ink); padding-bottom: 8px; }
+table.notation th[scope="rowgroup"] { border-bottom: 0; }
+.prose p { max-width: none; }
+#formulation > .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.model.boxed .mx { font-size: 0.86em; }
+
+/* Worked examples under each equation */
+details.exq { margin: 0 0 8px 0; border-left: 3px solid var(--accent); background: var(--bg); border-radius: 0 8px 8px 0; }
+details.exq summary { cursor: pointer; padding: 4px 12px; font-size: 0.85rem; font-weight: 600; color: var(--accent); width: fit-content; }
+details.exq[open] summary { padding-bottom: 2px; }
+.exbody { padding: 4px 14px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 0.93rem; }
+.exbody p { max-width: none; }
+.exbody .mx { font-size: 0.92em; }
+.exbody .btns { gap: 6px; }
+.exbody .chip { font-size: 0.8rem; padding: 2px 10px; }
+.exbody select { font: inherit; font-size: 0.85rem; padding: 3px 6px; border: 1px solid var(--ink); border-radius: 6px; background: var(--surface); color: var(--ink); width: fit-content; }
+.exlbl { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+.badge { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
+.badge.bind { background: var(--cap-soft); color: var(--cap); }
+.badge.slack { background: var(--accent-soft); color: var(--accent); }
+.exrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Problem type stage */
+.checks { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.muted { color: var(--muted); }
+.nt { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-family: var(--display); font-weight: 800; font-size: 0.75rem; margin-right: 6px; vertical-align: -5px; }
+.nt-s { background: var(--accent); color: #fff; }
+.nt-t { border: 2px solid var(--ink); border-radius: 5px; color: var(--ink); }
+.nt-d { background: var(--ink); color: var(--bg); }
+table.nodetypes td:first-child { white-space: nowrap; font-weight: 600; }
+.family { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fam { margin: 0; border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+.fam.here { border-color: var(--accent); border-width: 2px; }
+.fam svg { width: 100%; height: auto; display: block; }
+.fam-arcs line { stroke: var(--muted); stroke-width: 1.5; }
+.fn-s { fill: var(--accent); } .fn-d { fill: var(--ink); } .fn-t { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
+.fam figcaption { font-size: 0.88rem; color: var(--muted); }
+.fam figcaption b { display: block; color: var(--ink); font-size: 0.95rem; }
+.tile .s:only-of-type { color: var(--ink); }
+@media (max-width: 560px) { .family { grid-template-columns: 1fr; } }
+
+.pager { display: none; }
+
+/* Presenter mode */
+body.presenter { font-size: 1.2rem; }
+body.presenter .study-only { display: none !important; }
+body.presenter .stage { display: none; border: 0; background: transparent; padding: 8px 0; min-height: calc(100vh - 150px); }
+body.presenter .stage.active { display: flex; }
+body.presenter main { max-width: 1400px; padding-top: 16px; }
+body.presenter h2 { font-size: 2.4rem; }
+body.presenter .lede { font-size: 1.3rem; }
+body.presenter .pager { display: flex; position: fixed; right: 20px; bottom: 18px; gap: 8px; z-index: 11; }
+body.presenter .pager button { border: 1px solid var(--ink); background: var(--surface); border-radius: 10px; padding: 8px 16px; cursor: pointer; font-weight: 600; }
+body.presenter .pager span { align-self: center; font-family: var(--mono); color: var(--muted); padding: 0 8px; }
+body.presenter .math { font-size: 1.35rem; }
+body.presenter .mx { font-size: 1.15em; }
+body:not(.presenter) .presenter-only { display: none !important; }
+
+@media (max-width: 860px) {
+  .cols { grid-template-columns: 1fr; }
+  .eq { grid-template-columns: 1fr; }
+  .stage { padding: 20px 16px; }
+  h2 { font-size: 1.45rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .arc, .lbl { transition: opacity 0.2s, stroke 0.2s; }
+}
+
+
+.cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.card { display: flex; flex-direction: column; gap: 2px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); cursor: pointer; text-align: left; font-size: 0.85rem; color: var(--muted); }
+.card b { font-family: var(--display); font-size: 1.4rem; color: var(--ink); }
+.card .ret { font-family: var(--mono); color: var(--accent); }
+.card.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.meter { height: 14px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.meter-bar { height: 100%; background: var(--accent); width: 0; transition: width 0.2s; }
+.meter-bar.over { background: #b3261e; }
+.rules { display: flex; flex-direction: column; gap: 8px; }
+.rule { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; cursor: pointer; font-size: 0.93rem; }
+.rule.on { border-color: var(--accent); background: var(--accent-soft); }
+.rule input { accent-color: var(--accent); width: 18px; height: 18px; }
+table.truth td, table.truth th { text-align: center; text-transform: none; }
+table.truth td.match { background: #dff0e5; color: #1f5e3b; font-weight: 600; }
+table.truth td.clash { background: #f6d5d3; color: #8c1d18; font-weight: 600; }
+#mpTable th[scope="row"] { text-transform: none; color: var(--ink); }
+@media (max-width: 700px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+
+.modnav { max-width: 1180px; margin: 0 auto 40px; padding: 16px 20px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; border-top: 1px solid var(--line); font-size: 0.9rem; }
+.modnav b { font-family: var(--display); margin-right: 6px; }
+.modnav a { color: var(--ink); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; }
+.modnav a:hover { border-color: var(--ink); }
+.modnav a[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+body.presenter .modnav { display: none; }
+.here-row td { background: var(--accent-soft); }
+
+</style>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script src="assets/tex-svg.js" async></script>
+</head>
+<body>
+<header class="bar">
+  <div class="bar-inner">
+    <h1>Binary selection models · <span>Tatham</span></h1>
+    <nav class="stages" id="stageNav" aria-label="Stages"></nav>
+    <div class="mode" role="group" aria-label="View mode">
+      <button id="modeStudy" type="button" aria-pressed="true">Study</button>
+      <button id="modePresent" type="button" aria-pressed="false">Presenter</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+
+<!-- 0 -->
+<section class="stage" id="type" data-title="Problem type">
+  <div class="stage-head"><span class="stage-no">00</span><h2>Problem type: binary selection (knapsack) models</h2></div>
+  <p class="lede">A binary selection model makes yes-or-no decisions: fund a project or not, open a site or not. Each choice uses some of a limited resource and adds some value. The model picks the combination with the most value that fits. With a single budget it is called a knapsack problem: pack the most valuable items into a bag of fixed size.</p>
+  <div class="cols">
+    <div class="stack">
+      <h3>How to recognise one</h3>
+      <ul class="checks">
+        <li>Each option is <b>all or nothing</b>: there is no half a project.</li>
+        <li>Options use a <b>limited resource</b>, usually money, and add a known <b>value</b> such as NPV.</li>
+        <li>There may be <b>rules linking options</b>: one or the other, one only if another, at most so many.</li>
+        <li>The decisions are <b>0/1 variables</b>, one per option.</li>
+      </ul>
+      <div class="note">
+        <h3>The key modelling idea: 0/1 variables do logic</h3>
+        <p>Because each \(X_i\) is 0 or 1, sums and inequalities between them express rules. \(X_3 + X_4 \le 1\) means "not both". \(X_1 \le X_7\) means "1 only if 7". Stage 08 shows how.</p>
+      </div>
+    </div>
+    <div class="stack">
+      <h3>The family of models</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Model</th><th>Binary decision</th></tr></thead>
+          <tbody>
+            <tr class="here-row"><td><b>Capital budgeting</b> <span class="tag">This exercise</span></td><td>Fund each project or not</td></tr>
+            <tr><td>Fixed-cost models (14.9)</td><td>Rent the machine for each product or not</td></tr>
+            <tr><td>Set covering and facility location (14.10)</td><td>Open a hub or site or not</td></tr>
+            <tr><td>Crew and shift selection</td><td>Use each candidate schedule or not</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Common extension</th><th>What changes in the model</th></tr></thead>
+          <tbody>
+            <tr><td>Costs over several years</td><td>One budget constraint per year (stage 07)</td></tr>
+            <tr><td>Logical rules between projects</td><td>Linear constraints on the 0/1 variables (stage 08)</td></tr>
+            <tr><td>Partial projects allowed</td><td>Drop the binary restriction: an LP (stage 05)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="tiles">
+    <div class="tile"><span class="k">Harder to solve</span><span class="s">Integer models are solved by branch and bound, searching many LPs. Small models are quick; large ones can be very slow.</span></div>
+    <div class="tile"><span class="k">No Sensitivity Report</span><span class="s">Solver gives no shadow prices for integer models: the objective jumps as data change. Re-solve to see the effect of a change.</span></div>
+    <div class="tile"><span class="k">Greedy is not optimal</span><span class="s">Picking the best value-per-pound first often leaves budget unused. The optimiser looks at combinations.</span></div>
+    <div class="tile"><span class="k">Ties are common</span><span class="s">Several combinations often give the same best value, so Solver may return a different, equally good answer.</span></div>
+  </div>
+  <div class="stack study-only">
+    <h3>Check yourself: is it a binary selection model?</h3>
+    <details class="q"><summary>A charity chooses which of 12 grant applications to fund from a £500,000 pot, to help the most people.</summary><p>Yes. Each grant is funded fully or not at all, and they share one budget: a knapsack.</p></details>
+    <details class="q"><summary>Barney-Jones decides how many dollars to put into each of five investments.</summary><p>No. Amounts can take any value, so the variables are continuous. It is a linear multi-period model (14.6).</p></details>
+    <details class="q"><summary>A care board decides where to open clinics so as many people as possible live near one, within a budget.</summary><p>Yes. Each site is opened or not, with a budget: a binary model. It also needs coverage variables, as in maximal covering (14.10).</p></details>
+  </div>
+</section>
+
+<!-- 1 -->
+<section class="stage" id="problem" data-title="Problem">
+  <div class="stage-head"><span class="stage-no">01</span><h2>Choosing investments at Tatham</h2></div>
+  <p class="lede">Tatham is considering seven investments. Each needs cash now and adds a known NPV. Partial investments are not allowed, and $15 million is available. Which investments maximise total NPV?</p>
+  <div class="cols">
+    <div class="tbl-wrap"><table id="dataTable" aria-label="Investments: cost, NPV and return"></table></div>
+    <div class="stack">
+      <div class="tiles">
+        <div class="tile"><span class="k">Budget</span><span class="v">$15m</span><span class="s">cash available now</span></div>
+        <div class="tile"><span class="k">If all seven</span><span class="v">$31.2m</span><span class="s">cost, so choices are needed</span></div>
+        <div class="tile"><span class="k">Combinations</span><span class="v">128</span><span class="s">2⁷ yes/no patterns</span></div>
+      </div>
+      <details class="q study-only"><summary>Predict first: should Tatham simply pick the highest returns first?</summary><p>Try it in stage 02. Picking by return gives investments 4, 6 and 2 for an NPV of $14.6m, with $2.2m unspent. Solver finds $16.7m.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="stage" id="try" data-title="Try it">
+  <div class="stage-head"><span class="stage-no">02</span><h2>Pick a portfolio yourself</h2></div>
+  <p class="lede">Select investments to fund. Can you beat the greedy rule, or match Solver?</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="cards" id="cards"></div>
+      <div class="btns"><button class="chip" type="button" id="greedyBtn">Pick by highest return</button><button class="chip" type="button" id="optBtn">Show Solver's answer</button><button class="chip" type="button" id="clearBtn">Clear</button></div>
+    </div>
+    <div class="stack">
+      <div class="meter"><div class="meter-bar" id="budBar"></div></div>
+      <div class="tiles">
+        <div class="tile hot"><span class="k">Total NPV</span><span class="v" id="tryNpv">0</span><span class="s">$ million</span></div>
+        <div class="tile"><span class="k">Cost</span><span class="v" id="tryCost">0</span><span class="s" id="tryStat">of $15m budget</span></div>
+      </div>
+      <p id="tryText" style="font-size:0.98rem"></p>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section class="stage" id="formulation" data-title="Formulation">
+  <div class="stage-head"><span class="stage-no">03</span><h2>Model formulation</h2></div>
+  <p class="lede">The model formulation uses the notation in the table: one budget constraint and a binary variable for each investment.</p>
+  <div class="cols">
+    <div class="model">
+      <p class="mlabel">Objective function:</p>
+      <div class="mrow"><div class="mx">\[\max \sum_{i\in I} N_i X_i\]</div><span class="mno">(1)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex1"></div></details>
+      <p class="mlabel">Subject to:</p>
+      <div class="mrow"><div class="mx">\[\sum_{i\in I} C_i X_i \;\le\; B\]</div><span class="mno">(2)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex2"></div></details>
+      <div class="mrow"><div class="mx">\[X_i \in \{0,1\} \qquad \forall i \in I\]</div><span class="mno">(3)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex3"></div></details>
+    </div>
+    <div class="stack">
+      <div class="tbl-wrap">
+        <table class="notation" aria-label="Model notation table">
+          <caption><b>Table 1.</b> Model notation table.</caption>
+          <thead><tr><th></th><th>Notation</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><th scope="rowgroup">Sets</th><td>\(I\)</td><td>Set of potential investments, indexed by \(i\), \(I = \{1,\dots,7\}\)</td></tr>
+            <tr class="grp-start"><th scope="rowgroup" rowspan="3">Parameters</th><td>\(C_i\)</td><td>Cash required by investment \(i \in I\) ($ million)</td></tr>
+            <tr><td>\(N_i\)</td><td>NPV added by investment \(i \in I\) ($ million)</td></tr>
+            <tr><td>\(B\)</td><td>Cash available for investment, $15 million</td></tr>
+            <tr class="grp-start"><th scope="rowgroup">Decision variables</th><td>\(X_i\)</td><td>1 if investment \(i \in I\) is undertaken, 0 otherwise</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tiles">
+        <div class="tile"><span class="k">Variables</span><span class="v">7</span><span class="s">binary</span></div>
+        <div class="tile"><span class="k">Constraints</span><span class="v">1</span><span class="s">budget: a knapsack</span></div>
+        <div class="tile"><span class="k">Model type</span><span class="v">IP</span><span class="s">binary integer</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="prose study-only">
+    <p>The objective (1) maximises the total NPV of the investments chosen: because each \(X_i\) is 0 or 1, it adds the NPV of exactly those investments undertaken. Constraint (2) ensures that the total cash required by the chosen investments does not exceed the $15 million available. Constraints (3) make every decision a yes or no, so no investment can be partly funded.</p>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="stage" id="excel" data-title="Excel ↔ maths">
+  <div class="stage-head"><span class="stage-no">04</span><h2>From the spreadsheet to the maths</h2></div>
+  <p class="lede">In <i>Capital Budgeting Finished.xlsx</i> the binary restriction is a constraint in the Solver dialog.</p>
+  <div class="cols">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Range name</th><th>Cells</th><th>Formula</th><th>In the maths</th></tr></thead>
+        <tbody>
+          <tr><td>Cost, NPV</td><td class="mono">B5:H6</td><td>inputs</td><td>\(C_i\), \(N_i\)</td></tr>
+          <tr><td><b>Decisions</b></td><td class="mono">B10:H10</td><td>changing cells, binary</td><td>\(X_i\), constraint (3)</td></tr>
+          <tr><td>Total_cost</td><td class="mono">B14</td><td><code>=SUMPRODUCT(B5:H5,Decisions)</code></td><td>left side of (2)</td></tr>
+          <tr><td>Budget</td><td class="mono">D14</td><td>input</td><td>\(B\)</td></tr>
+          <tr><td><b>Total_NPV</b></td><td class="mono">B17</td><td><code>=SUMPRODUCT(B6:H6,Decisions)</code></td><td>objective (1)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="stack">
+      <div class="solver-box" aria-label="Solver settings">
+        <b>Solver settings</b>
+        <span>Set objective: Total_NPV &nbsp;→ Max</span>
+        <span>By changing: Decisions</span>
+        <span>Subject to:</span>
+        <span>&nbsp; Decisions = binary</span>
+        <span>&nbsp; Total_cost &lt;= Budget</span>
+        <span>Method: Simplex LP</span>
+        <span>Options: set Integer Optimality to 0%</span>
+      </div>
+      <div class="note study-only"><h3>Integer optimality tolerance</h3><p>Solver stops an integer search once it is within the Integer Optimality percentage of the best possible value (1% by default in some versions). Set it to 0% to be sure the answer is truly optimal.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="stage" id="solution" data-title="Optimal portfolio">
+  <div class="stage-head"><span class="stage-no">05</span><h2>The optimal portfolio adds $16.7 million of NPV</h2></div>
+  <p class="lede">Investments 3, 5 and 6 use $14.9m of the $15m. Two other portfolios tie exactly.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="tbl-wrap"><table id="tieTable" aria-label="Portfolios with the best NPV"></table></div>
+      <div class="note study-only"><h3>Why Solver may show a different answer</h3><p>All three portfolios add $16.7m. Which one Solver reports depends on its search order. Each is correct; a manager can choose between them on other grounds, such as risk or strategy.</p></div>
+    </div>
+    <div class="stack">
+      <h3>What if partial investments were allowed?</h3>
+      <div class="tbl-wrap"><table id="lpTable" aria-label="LP relaxation"></table></div>
+      <p style="font-size:0.98rem">Without (3), the LP funds 44% of investment 1 and reaches $17.06m. It is an upper bound: no whole-project portfolio can beat it. The gap of $0.36m is the cost of indivisibility.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="stage" id="budget" data-title="What if: budget">
+  <div class="stage-head"><span class="stage-no">06</span><h2>NPV rises in jumps as the budget grows</h2></div>
+  <p class="lede">Drag the budget. Every value is a fresh solve, as in the SolverTable sheets.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="ctrl">
+        <label for="budS">Budget <output id="budO" for="budS">$15.0m</output></label>
+        <input type="range" id="budS" min="5" max="25" step="0.1" value="15">
+        <div class="ticks"><span>$5m</span><span>$15m</span><span>$25m</span></div>
+      </div>
+      <div class="chart"><svg id="budChart" viewBox="0 0 560 260" role="img" aria-label="Best NPV against budget"></svg></div>
+    </div>
+    <div class="stack">
+      <div class="tiles">
+        <div class="tile hot"><span class="k">Best NPV</span><span class="v" id="budNpv">16.7</span><span class="s">$ million</span></div>
+        <div class="tile"><span class="k">Portfolio</span><span class="v" id="budSet" style="font-size:1rem">3, 5, 6</span><span class="s" id="budCost"></span></div>
+      </div>
+      <div class="note study-only"><h3>Why no Sensitivity Report?</h3><p>Shadow prices measure the value of a tiny change in a resource. With whole projects, a little more budget is worth nothing until it is enough to afford a different combination, and then NPV jumps. The line is a staircase, not a slope, so there is no single "value per extra $1" to report. Re-solving at each budget is the only reliable way.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section class="stage" id="multi" data-title="Two-year budgets">
+  <div class="stage-head"><span class="stage-no">07</span><h2>When costs are spread over two years</h2></div>
+  <p class="lede">In <i>Capital Budgeting Multiple Period Finished.xlsx</i> each investment's cost is split between year 1 and year 2, with a separate budget for each year.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="tbl-wrap"><table id="mpTable" aria-label="Costs by year"></table></div>
+      <div class="model boxed">
+        <p class="mlabel">Constraint (2) becomes one constraint per year:</p>
+        <div class="mrow"><div class="mx">\[\sum_{i\in I} C_{it} X_i \;\le\; B_t \qquad \forall t \in \{1,2\}\]</div><span class="mno">(2′)</span></div>
+      </div>
+    </div>
+    <div class="stack">
+      <div class="ctrl"><label for="b1S">Year 1 budget <output id="b1O" for="b1S">$9.0m</output></label><input type="range" id="b1S" min="4" max="15" step="0.5" value="9"></div>
+      <div class="ctrl"><label for="b2S">Year 2 budget <output id="b2O" for="b2S">$6.0m</output></label><input type="range" id="b2S" min="2" max="12" step="0.5" value="6"></div>
+      <div class="tiles">
+        <div class="tile hot"><span class="k">Best NPV</span><span class="v" id="mpNpv">15.1</span><span class="s">$ million</span></div>
+        <div class="tile"><span class="k">Portfolio</span><span class="v" id="mpSet" style="font-size:1rem">1, 2, 4</span><span class="s" id="mpUse"></span></div>
+      </div>
+      <details class="q study-only"><summary>Why does this answer differ from stage 05?</summary><p>The single-budget portfolio 3, 5, 6 needs only $6.4m in year 1 but $8.5m in year 2, more than the $6m available that year. Investments 1, 2 and 4 are front-loaded: they use all $9m of year 1 and just $4.3m of year 2. Timing, not just total cost, now decides the portfolio.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- 8 -->
+<section class="stage" id="logic" data-title="Logical constraints">
+  <div class="stage-head"><span class="stage-no">08</span><h2>Logical constraints between investments</h2></div>
+  <p class="lede">Real projects interact. Because each \(X_i\) is 0 or 1, rules between them can be written as linear constraints. This stage uses a $19m budget, where one portfolio is clearly best; at $15m three portfolios tie, so a rule often just moves Solver to another equally good one.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="rules" id="rules"></div>
+      <div class="tiles">
+        <div class="tile hot"><span class="k">Best NPV</span><span class="v" id="lgNpv">21.4</span><span class="s">$ million, budget $19m</span></div>
+        <div class="tile"><span class="k">Portfolio</span><span class="v" id="lgSet" style="font-size:1rem">1, 3, 4, 6</span><span class="s" id="lgCost"></span></div>
+        <div class="tile"><span class="k">Cost of the rules</span><span class="v" id="lgPrice">0</span><span class="s">$ million of NPV given up</span></div>
+      </div>
+    </div>
+    <div class="stack">
+      <h3>Which way round? Checking an if-then rule</h3>
+      <p style="font-size:0.98rem">"Investment 1 can only go ahead if investment 7 does." Every combination of \(X_1\) and \(X_7\) is listed. The rule forbids exactly one of them. Which inequality forbids the same one?</p>
+      <div class="tbl-wrap"><table class="truth" id="truth" aria-label="Truth table for the if-then rule"></table></div>
+      <div class="btns" role="group" aria-label="Choose the inequality"><button class="chip" type="button" data-q="a">\(X_1 \le X_7\)</button><button class="chip" type="button" data-q="b">\(X_7 \le X_1\)</button></div>
+      <p id="quizText" style="font-size:0.98rem"></p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Rule in words</th><th>Linear constraint</th></tr></thead>
+          <tbody>
+            <tr><td>At most one of \(i\) and \(j\)</td><td>\(X_i + X_j \le 1\)</td></tr>
+            <tr><td>Exactly one of \(i\) and \(j\)</td><td>\(X_i + X_j = 1\)</td></tr>
+            <tr><td>At least one of \(i\) and \(j\)</td><td>\(X_i + X_j \ge 1\)</td></tr>
+            <tr><td>\(i\) only if \(j\) (if \(i\) then \(j\))</td><td>\(X_i \le X_j\)</td></tr>
+            <tr><td>\(i\) and \(j\) together or not at all</td><td>\(X_i = X_j\)</td></tr>
+            <tr><td>At most \(k\) of a group</td><td>\(\sum_{i \in G} X_i \le k\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer class="modnav" aria-label="Advanced optimisation models"><b><a class="home" href="index.html">Advanced optimisation models</a></b><a href="investment.html">14.6 Investment strategy</a><a href="pension.html">14.7 Pension fund</a><a href="capital.html" aria-current="page">14.8 Capital budgeting</a><a href="fixedcost.html">14.9 Fixed-cost models</a><a href="hubs.html">14.10 Hub location</a><a href="electricity.html">14.11 Electricity pricing</a><a href="portfolio.html">14.12 Portfolio selection</a></footer>
+<div class="pager" aria-label="Presenter navigation">
+  <button type="button" id="prevBtn">← Back</button>
+  <span id="pageNo">1 / 1</span>
+  <button type="button" id="nextBtn">Next →</button>
+</div>
+<script>
+// Two-phase dense simplex with Bland's rule. Minimise c.x subject to rows, x >= 0.
+// rows: [{a:[...], sense:'<='|'>='|'=', b:number}]
+function solveLP(c, rows) {
+  const EPS = 1e-9;
+  const n = c.length;
+  const m = rows.length;
+  const R = rows.map(r => {
+    if (r.b < 0) return { a: r.a.map(v => -v), b: -r.b, sense: r.sense === '<=' ? '>=' : r.sense === '>=' ? '<=' : '=' };
+    return { a: r.a.slice(), b: r.b, sense: r.sense };
+  });
+  let nSlack = 0, nArt = 0;
+  R.forEach(r => { if (r.sense !== '=') nSlack++; if (r.sense !== '<=') nArt++; });
+  const N = n + nSlack + nArt;
+  const T = [];
+  const basis = [];
+  let si = n, ai = n + nSlack;
+  const artCols = [];
+  R.forEach(r => {
+    const row = new Float64Array(N + 1);
+    for (let j = 0; j < n; j++) row[j] = r.a[j];
+    if (r.sense === '<=') { row[si] = 1; basis.push(si); si++; }
+    else if (r.sense === '>=') { row[si] = -1; si++; row[ai] = 1; basis.push(ai); artCols.push(ai); ai++; }
+    else { row[ai] = 1; basis.push(ai); artCols.push(ai); ai++; }
+    row[N] = r.b;
+    T.push(row);
+  });
+  const isArt = new Uint8Array(N);
+  artCols.forEach(j => isArt[j] = 1);
+
+  function pivot(pr, pc) {
+    const prow = T[pr];
+    const pv = prow[pc];
+    for (let j = 0; j <= N; j++) prow[j] /= pv;
+    for (let i = 0; i < m; i++) {
+      if (i === pr) continue;
+      const f = T[i][pc];
+      if (Math.abs(f) > EPS) { const row = T[i]; for (let j = 0; j <= N; j++) row[j] -= f * prow[j]; }
+    }
+    basis[pr] = pc;
+  }
+  function run(cost, allowed) {
+    for (let iter = 0; iter < 5000; iter++) {
+      // reduced costs
+      let enter = -1;
+      for (let j = 0; j < N; j++) {
+        if (!allowed(j)) continue;
+        let rc = cost[j];
+        for (let i = 0; i < m; i++) rc -= cost[basis[i]] * T[i][j];
+        if (rc < -EPS) { enter = j; break; } // Bland
+      }
+      if (enter < 0) return 'optimal';
+      let leave = -1, best = Infinity;
+      for (let i = 0; i < m; i++) {
+        const a = T[i][enter];
+        if (a > EPS) {
+          const r = T[i][N] / a;
+          if (r < best - EPS || (Math.abs(r - best) <= EPS && basis[i] < basis[leave])) { best = r; leave = i; }
+        }
+      }
+      if (leave < 0) return 'unbounded';
+      pivot(leave, enter);
+    }
+    return 'iterlimit';
+  }
+  // Phase 1
+  const c1 = new Float64Array(N); artCols.forEach(j => c1[j] = 1);
+  run(c1, () => true);
+  let infeas = 0;
+  for (let i = 0; i < m; i++) if (isArt[basis[i]]) infeas += T[i][N];
+  if (infeas > 1e-7) return { status: 'infeasible' };
+  // drive remaining artificials out of basis
+  for (let i = 0; i < m; i++) {
+    if (!isArt[basis[i]]) continue;
+    for (let j = 0; j < n + nSlack; j++) if (Math.abs(T[i][j]) > 1e-9) { pivot(i, j); break; }
+  }
+  // Phase 2
+  const c2 = new Float64Array(N); for (let j = 0; j < n; j++) c2[j] = c[j];
+  const st = run(c2, j => !isArt[j]);
+  if (st !== 'optimal') return { status: st };
+  const x = new Array(n).fill(0);
+  for (let i = 0; i < m; i++) if (basis[i] < n) x[basis[i]] = T[i][N];
+  let z = 0; for (let j = 0; j < n; j++) z += c[j] * x[j];
+  return { status: 'optimal', x, z };
+}
+
+
+// Branch and bound on top of solveLP. ints = indices that must be whole numbers.
+function solveMILP(c, rows, ints) {
+  let best = null, nodes = 0;
+  const stack = [[]];
+  while (stack.length && nodes < 20000) {
+    const extra = stack.pop(); nodes++;
+    const r = solveLP(c, rows.concat(extra));
+    if (r.status !== 'optimal') continue;
+    if (best && r.z >= best.z - 1e-7) continue;
+    let k = -1, worst = 1e-6;
+    for (const j of ints) { const f = Math.abs(r.x[j] - Math.round(r.x[j])); if (f > worst) { worst = f; k = j; } }
+    if (k < 0) { r.x = r.x.map((v, j) => ints.includes(j) ? Math.round(v) : v); best = r; continue; }
+    const lo = new Array(c.length).fill(0); lo[k] = 1;
+    stack.push(extra.concat([{ a: lo, sense: '>=', b: Math.ceil(r.x[k]) }]));
+    stack.push(extra.concat([{ a: lo.slice(), sense: '<=', b: Math.floor(r.x[k]) }]));
+  }
+  return best ? Object.assign(best, { nodes }) : { status: 'infeasible', nodes };
+}
+const row = (n, terms, sense, b) => { const a = new Array(n).fill(0); for (const [j, v] of terms) a[j] += v; return { a, sense, b }; };
+const SVGNS = 'http://www.w3.org/2000/svg';
+const fmt = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString('en-GB', { maximumFractionDigits: d });
+const key = a => a[0] + '-' + a[1];
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+const tnum = (v, d = 2) => fmt(v, d).replace(/,/g, '{,}');
+const cap1 = s => s.replace(/^./, c => c.toUpperCase());
+function typeset(elm) {
+  if (window.MathJax && MathJax.typesetPromise) { try { MathJax.typesetClear([elm]); } catch (e) {} MathJax.typesetPromise([elm]).catch(() => {}); }
+}
+function badge(lhs, rhs, sense, unit) {
+  const gap = sense === '<=' ? rhs - lhs : sense === '>=' ? lhs - rhs : 0;
+  if (Math.abs(gap) < 1e-6) return '<span class="badge bind">binding: no room to spare</span>';
+  return `<span class="badge slack">slack: ${fmt(gap)}${unit ? ' ' + unit : ''} to spare</span>`;
+}
+function chipRow(opts, sel, attr) {
+  return '<div class="btns" role="group" aria-label="Choose an example">' + opts.map(([v, label]) =>
+    `<button type="button" class="chip" ${attr}="${v}" aria-pressed="${String(sel) === String(v)}">${label}</button>`).join('') + '</div>';
+}
+// Worked examples: EX[n] = () => html; chips use data-exv, handler sets EXSEL[n]
+const EX = {}, EXSEL = {};
+function renderEx(n) {
+  const elm = document.getElementById('ex' + n); if (!elm) return;
+  elm.innerHTML = EX[n]();
+  elm.querySelectorAll('[data-exv]').forEach(b => b.addEventListener('click', () => { EXSEL[n] = b.dataset.exv; renderEx(n); }));
+  elm.querySelectorAll('select[data-exsel]').forEach(s => s.addEventListener('change', () => { EXSEL[n] = s.value; renderEx(n); }));
+  typeset(elm);
+}
+function renderAllEx() { Object.keys(EX).forEach(n => renderEx(n)); }
+// ---------- Line chart ----------
+function drawChart(svg, pts, cur, o) {
+  svg.innerHTML = '';
+  const W = 560, H = 250, L = 62, R = 18, T = 30, B = 42;
+  const xs = pts.map(p => p.x), ys = pts.filter(p => p.y != null).map(p => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const lo0 = o.fit ? Math.min(...ys) : 0, rawStep = (Math.max(...ys) - lo0) / 4 || Math.max(...ys) / 4 || 1, mag = 10 ** Math.floor(Math.log10(rawStep));
+  const ystep = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= rawStep);
+  const yMin = o.fit ? Math.floor(lo0 / ystep) * ystep : 0, yMax = Math.max(yMin + ystep, Math.ceil(Math.max(...ys) / ystep) * ystep);
+  const sx = v => L + (v - x0) / (x1 - x0) * (W - L - R);
+  const sy = v => H - B - (v - yMin) / (yMax - yMin) * (H - T - B);
+  for (let v = yMin; v <= yMax + 1e-9; v += ystep) {
+    el('line', { x1: L, x2: W - R, y1: sy(v), y2: sy(v), class: 'ch-grid' }, svg);
+    el('text', { x: L - 8, y: sy(v) + 4, 'text-anchor': 'end', class: 'ch-txt' }, svg).textContent = fmt(v, 0);
+  }
+  o.xTicks.forEach(v => {
+    el('text', { x: sx(v), y: H - B + 18, 'text-anchor': 'middle', class: 'ch-txt' }, svg).textContent = o.xFmt(v);
+  });
+  el('line', { x1: L, x2: W - R, y1: H - B, y2: H - B, class: 'ch-axis' }, svg);
+  el('text', { x: L, y: 16, class: 'ch-ttl' }, svg).textContent = o.yLabel;
+  el('text', { x: W - R, y: H - 4, 'text-anchor': 'end', class: 'ch-ttl' }, svg).textContent = o.xLabel;
+  const ok = pts.filter(p => p.y != null);
+  const line = ok.map((p, i) => (i ? 'L' : 'M') + sx(p.x).toFixed(1) + ',' + sy(p.y).toFixed(1)).join(' ');
+  el('path', { d: line + ` L${sx(ok[ok.length - 1].x)},${sy(yMin)} L${sx(ok[0].x)},${sy(yMin)} Z`, class: 'ch-area' }, svg);
+  el('path', { d: line, class: 'ch-line' }, svg);
+  const c = pts.find(p => Math.abs(p.x - cur) < 1e-9);
+  if (c && c.y != null) {
+    el('line', { x1: sx(c.x), x2: sx(c.x), y1: sy(c.y), y2: H - B, class: 'ch-grid', 'stroke-dasharray': '3 3' }, svg);
+    el('circle', { cx: sx(c.x), cy: sy(c.y), r: 6, class: 'ch-dot' }, svg);
+    const right = sx(c.x) > W - 130;
+    const yfmt = o.yFmt || (v => fmt(v, 1));
+    el('text', { x: sx(c.x) + (right ? -12 : 12), y: sy(c.y) - 10, 'text-anchor': right ? 'end' : 'start', class: 'ch-cur' }, svg).textContent = yfmt(c.y);
+  }
+}
+
+function initNav() {
+const stages = [...document.querySelectorAll('.stage')];
+const nav = document.getElementById('stageNav');
+let cur = 0;
+stages.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.textContent = `${s.querySelector('.stage-no').textContent}  ${s.dataset.title}`;
+  b.addEventListener('click', () => go(i, true));
+  nav.appendChild(b);
+});
+function presenter() { return document.body.classList.contains('presenter'); }
+function go(i, scroll) {
+  cur = Math.max(0, Math.min(stages.length - 1, i));
+  stages.forEach((s, k) => s.classList.toggle('active', k === cur));
+  [...nav.children].forEach((b, k) => b.setAttribute('aria-current', k === cur ? 'true' : 'false'));
+  document.getElementById('pageNo').textContent = `${cur + 1} / ${stages.length}`;
+  if (presenter()) window.scrollTo(0, 0);
+  else if (scroll) stages[cur].scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+function setMode(m) {
+  document.body.classList.toggle('presenter', m === 'presenter');
+  document.getElementById('modeStudy').setAttribute('aria-pressed', m === 'study');
+  document.getElementById('modePresent').setAttribute('aria-pressed', m === 'presenter');
+  try { localStorage.setItem('om-mode', m); } catch (e) {}
+  go(cur, m === 'study');
+}
+document.getElementById('modeStudy').addEventListener('click', () => setMode('study'));
+document.getElementById('modePresent').addEventListener('click', () => setMode('presenter'));
+document.getElementById('prevBtn').addEventListener('click', () => go(cur - 1));
+document.getElementById('nextBtn').addEventListener('click', () => go(cur + 1));
+document.addEventListener('keydown', e => {
+  if (!presenter() || e.target.tagName === 'INPUT') return;
+  if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(cur + 1); }
+  if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); go(cur - 1); }
+});
+if ('IntersectionObserver' in window) {
+  const io = new IntersectionObserver(es => {
+    if (presenter()) return;
+    es.forEach(e => { if (e.isIntersecting) { cur = stages.indexOf(e.target); [...nav.children].forEach((b, k) => b.setAttribute('aria-current', k === cur ? 'true' : 'false')); } });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  stages.forEach(s => io.observe(s));
+}
+let saved = 'study';
+try { saved = localStorage.getItem('om-mode') || 'study'; } catch (e) {}
+setMode(saved);
+go(0, false);
+}
+
+// ---------- Small convex QP solver (face enumeration) ----------
+// min 0.5 x'Qx + c'x  s.t. Aeq x = beq, Ain x <= bin. Enumerates active sets; fine for a handful of constraints.
+function linsolve(M, v) {
+  const n = v.length, A = M.map((r, i) => r.concat([v[i]]));
+  for (let k = 0; k < n; k++) {
+    let p = k; for (let i = k + 1; i < n; i++) if (Math.abs(A[i][k]) > Math.abs(A[p][k])) p = i;
+    if (Math.abs(A[p][k]) < 1e-12) return null;
+    [A[k], A[p]] = [A[p], A[k]];
+    for (let i = 0; i < n; i++) if (i !== k) { const f = A[i][k] / A[k][k]; for (let j = k; j <= n; j++) A[i][j] -= f * A[k][j]; }
+  }
+  return A.map((r, i) => r[n] / r[i]);
+}
+function solveQP(Q, c, Aeq, beq, Ain, bin) {
+  const n = c.length, m = Ain.length;
+  let best = null;
+  for (let mask = 0; mask < (1 << m); mask++) {
+    const E = Aeq.slice(), e = beq.slice();
+    for (let k = 0; k < m; k++) if (mask & (1 << k)) { E.push(Ain[k]); e.push(bin[k]); }
+    const q = E.length, N = n + q;
+    if (q > n) continue;
+    const M = [], v = [];
+    for (let i = 0; i < n; i++) { const r = Q[i].slice(); for (let k = 0; k < q; k++) r.push(E[k][i]); M.push(r); v.push(-c[i]); }
+    for (let k = 0; k < q; k++) { M.push(E[k].concat(new Array(q).fill(0))); v.push(e[k]); }
+    const s = linsolve(M, v); if (!s) continue;
+    const x = s.slice(0, n);
+    if (!Ain.every((a, k) => a.reduce((t, aj, j) => t + aj * x[j], 0) <= bin[k] + 1e-7)) continue;
+    let f = 0; for (let i = 0; i < n; i++) { f += c[i] * x[i]; for (let j = 0; j < n; j++) f += 0.5 * x[i] * Q[i][j] * x[j]; }
+    if (!best || f < best.z - 1e-12) best = { status: 'optimal', x, z: f };
+  }
+  return best || { status: 'infeasible' };
+}
+
+
+const COST = [5, 2.4, 3.5, 5.9, 6.9, 4.5, 3], NPV = [5.6, 2.7, 3.9, 6.8, 7.7, 5.1, 3.3];
+const Y1 = [4, 2, 1, 3, 3.9, 1.5, 0], Y2 = [1, 0.4, 2.5, 2.9, 3, 3, 3];
+const ALL = []; for (let m = 0; m < 128; m++) ALL.push([0,1,2,3,4,5,6].map(i => (m >> i) & 1));
+const dot = (a, x) => a.reduce((s, v, i) => s + v * x[i], 0);
+const r2 = v => Math.round(v * 100) / 100;
+function best(feasible) {
+  let b = -1, ties = [];
+  ALL.forEach(x => { if (!feasible(x)) return; const v = r2(dot(NPV, x)); if (v > b + 1e-9) { b = v; ties = [x]; } else if (Math.abs(v - b) < 1e-9) ties.push(x); });
+  return { npv: b, ties };
+}
+const setStr = x => x.map((v, i) => v ? i + 1 : null).filter(Boolean).join(', ') || 'none';
+const base = best(x => dot(COST, x) <= 15 + 1e-9);
+const BASEX = [0,0,1,0,1,1,0];
+
+// Stage 1
+document.getElementById('dataTable').innerHTML = '<thead><tr><th>Investment</th><th class="r">Cost ($m)</th><th class="r">NPV ($m)</th><th class="r">Return</th></tr></thead><tbody>' +
+  COST.map((c, i) => `<tr><td>${i + 1}</td><td class="r num">${c}</td><td class="r num">${NPV[i]}</td><td class="r num">${((NPV[i] / c - 1) * 100).toFixed(1)}%</td></tr>`).join('') + '</tbody>';
+
+// Stage 2
+const TRY = [0,0,0,0,0,0,0];
+function updTry(msg) {
+  document.getElementById('cards').innerHTML = COST.map((c, i) => `<button type="button" class="card${TRY[i] ? ' on' : ''}" data-i="${i}" aria-pressed="${!!TRY[i]}"><b>${i + 1}</b><span>cost $${c}m</span><span>NPV $${NPV[i]}m</span><span class="ret">${((NPV[i] / c - 1) * 100).toFixed(1)}%</span></button>`).join('');
+  document.querySelectorAll('#cards .card').forEach(b => b.addEventListener('click', () => { TRY[+b.dataset.i] ^= 1; updTry(); }));
+  const c = dot(COST, TRY), v = dot(NPV, TRY);
+  document.getElementById('tryNpv').textContent = fmt(v, 1);
+  document.getElementById('tryCost').textContent = '$' + fmt(c, 1) + 'm';
+  document.getElementById('tryStat').textContent = c > 15 + 1e-9 ? 'over budget!' : `of $15m: $${fmt(15 - c, 1)}m unspent`;
+  const bar = document.getElementById('budBar'); bar.style.width = Math.min(100, c / 15 * 100) + '%'; bar.classList.toggle('over', c > 15 + 1e-9);
+  document.getElementById('tryText').textContent = msg || (c > 15 + 1e-9 ? 'This portfolio costs more than the budget.' : Math.abs(v - 16.7) < 1e-9 ? 'That is the best possible NPV: $16.7m.' : `The best possible is $16.7m; you are $${fmt(16.7 - v, 1)}m short.`);
+}
+document.getElementById('greedyBtn').addEventListener('click', () => {
+  TRY.fill(0); let c = 0;
+  [0,1,2,3,4,5,6].sort((a, b) => NPV[b] / COST[b] - NPV[a] / COST[a]).forEach(i => { if (c + COST[i] <= 15 + 1e-9) { TRY[i] = 1; c += COST[i]; } });
+  updTry('Highest return first: 4 (15.3%), then 6, then 2. Nothing else fits, so $2.2m is left unspent and NPV is only $14.6m.');
+});
+document.getElementById('optBtn').addEventListener('click', () => { BASEX.forEach((v, i) => TRY[i] = v); updTry('Solver: investments 3, 5 and 6, using $14.9m for $16.7m of NPV. None of them has the highest return, but together they use the budget almost fully.'); });
+document.getElementById('clearBtn').addEventListener('click', () => { TRY.fill(0); updTry(); });
+updTry();
+
+// Examples
+EXSEL[2] = '0'; EXSEL[3] = '3';
+EX[1] = () => `<p>The sum runs over all seven investments. A term counts only when its \\(X_i\\) is 1.</p>
+  <span class="exlbl">Written out</span><div class="mx">\\[5.6X_1 + 2.7X_2 + 3.9X_3 + 6.8X_4 + 7.7X_5 + 5.1X_6 + 3.3X_7\\]</div>
+  <span class="exlbl">With the optimal portfolio (stage 05)</span><div class="mx">\\[5.6(0) + 2.7(0) + 3.9(1) + 6.8(0) + 7.7(1) + 5.1(1) + 3.3(0) = 16.7\\]</div>`;
+const PORTS = { 0: BASEX, 1: [0,1,0,1,0,1,0], 2: [1,1,1,0,1,0,0] };
+EX[2] = () => { const x = PORTS[EXSEL[2]], c = dot(COST, x);
+  return chipRow([[0, 'Solver: 3, 5, 6'], [1, 'Greedy: 2, 4, 6'], [2, 'Try 1, 2, 3, 5']], EXSEL[2], 'data-exv') +
+  `<span class="exlbl">Written out</span><div class="mx">\\[5X_1 + 2.4X_2 + 3.5X_3 + 5.9X_4 + 6.9X_5 + 4.5X_6 + 3X_7 \\le 15\\]</div>
+  <span class="exlbl">For portfolio ${setStr(x)}</span><div class="mx">\\[${COST.map((cc, i) => x[i] ? cc : null).filter(v => v !== null).join(' + ')} = ${tnum(c, 1)} \\le 15\\]</div>
+  <p>${c > 15 + 1e-9 ? '<span class="badge slack" style="background:#f6d5d3;color:#b3261e">violated: over budget</span> This portfolio is not allowed.' : badge(c, 15, '<=', '$m')}</p>`; };
+EX[3] = () => { const i = +EXSEL[3];
+  return chipRow([0,1,2,3,4,5,6].map(k => [k, 'Inv. ' + (k + 1)]), EXSEL[3], 'data-exv') +
+  `<span class="exlbl">Written out</span><div class="mx">\\[X_${i + 1} \\in \\{0, 1\\}\\]</div>
+  <span class="exlbl">In the optimal portfolio</span><div class="mx">\\[X_${i + 1} = ${BASEX[i]}\\]</div>
+  <p>Investment ${i + 1} is ${BASEX[i] ? 'undertaken in full' : 'not undertaken'}. Without (3), Solver could choose \\(X_${i + 1} = 0.44\\), meaning 44% of the investment, which Tatham cannot do.</p>
+  <p class="ex">Constraint (3) creates 7 binary restrictions. In Excel: Decisions = binary.</p>`; };
+
+// Stage 5
+document.getElementById('tieTable').innerHTML = '<thead><tr><th>Portfolio</th><th class="r">Cost ($m)</th><th class="r">NPV ($m)</th></tr></thead><tbody>' +
+  base.ties.map(x => `<tr><td>${setStr(x)}</td><td class="r num">${fmt(dot(COST, x), 1)}</td><td class="r num">${fmt(dot(NPV, x), 1)}</td></tr>`).join('') + '</tbody>';
+const LP = solveLP(NPV.map(v => -v), [{ a: COST, sense: '<=', b: 15 }].concat([0,1,2,3,4,5,6].map(i => row(7, [[i, 1]], '<=', 1))));
+document.getElementById('lpTable').innerHTML = '<thead><tr><th>Investment</th><th class="r">Share funded</th></tr></thead><tbody>' +
+  LP.x.map((v, i) => `<tr><td>${i + 1}</td><td class="r num">${Math.round(v * 100)}%</td></tr>`).join('') + `<tr class="total"><td>NPV</td><td class="r num">$${fmt(-LP.z, 2)}m</td></tr></tbody>`;
+
+// Stage 6
+const budS = document.getElementById('budS');
+const budPts = []; for (let b = 5; b <= 25.001; b += 0.1) budPts.push({ x: r2(b), y: best(x => dot(COST, x) <= b + 1e-9).npv });
+function upd6() {
+  const B = +budS.value, r = best(x => dot(COST, x) <= B + 1e-9);
+  document.getElementById('budO').textContent = '$' + B.toFixed(1) + 'm';
+  document.getElementById('budNpv').textContent = fmt(r.npv, 1);
+  document.getElementById('budSet').textContent = setStr(r.ties[0]) + (r.ties.length > 1 ? ` (+${r.ties.length - 1} tie${r.ties.length > 2 ? 's' : ''})` : '');
+  document.getElementById('budCost').textContent = `costs $${fmt(dot(COST, r.ties[0]), 1)}m`;
+  drawStep(document.getElementById('budChart'), budPts, B);
+}
+function drawStep(svg, pts, cur) {
+  svg.innerHTML = '';
+  const W = 560, H = 260, L = 50, R = 16, T = 26, Bt = 40, x0 = 5, x1 = 25, yMax = 30;
+  const sx = v => L + (v - x0) / (x1 - x0) * (W - L - R), sy = v => H - Bt - v / yMax * (H - T - Bt);
+  for (let v = 0; v <= yMax; v += 5) { el('line', { x1: L, x2: W - R, y1: sy(v), y2: sy(v), class: 'ch-grid' }, svg); el('text', { x: L - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'ch-txt' }, svg).textContent = v; }
+  [5, 10, 15, 20, 25].forEach(v => el('text', { x: sx(v), y: H - Bt + 18, 'text-anchor': 'middle', class: 'ch-txt' }, svg).textContent = '$' + v + 'm');
+  el('text', { x: L, y: 14, class: 'ch-ttl' }, svg).textContent = 'Best NPV ($m)';
+  let d = `M${sx(pts[0].x)},${sy(pts[0].y)}`;
+  for (let k = 1; k < pts.length; k++) d += ` L${sx(pts[k].x)},${sy(pts[k - 1].y)} L${sx(pts[k].x)},${sy(pts[k].y)}`;
+  el('path', { d, class: 'ch-line' }, svg);
+  const c = pts.reduce((a, p) => Math.abs(p.x - cur) < Math.abs(a.x - cur) ? p : a, pts[0]);
+  el('circle', { cx: sx(cur), cy: sy(c.y), r: 6, class: 'ch-dot' }, svg);
+  el('text', { x: sx(cur) + 10, y: sy(c.y) - 8, class: 'ch-cur' }, svg).textContent = fmt(c.y, 1);
+  el('line', { x1: L, x2: W - R, y1: sy(0), y2: sy(0), class: 'ch-axis' }, svg);
+}
+budS.addEventListener('input', upd6); upd6();
+
+// Stage 7
+document.getElementById('mpTable').innerHTML = '<thead><tr><th>Investment</th>' + [1,2,3,4,5,6,7].map(i => `<th class="r">${i}</th>`).join('') + '</tr></thead><tbody>' +
+  `<tr><th scope="row">Year 1 cost</th>${Y1.map(v => `<td class="r num">${v}</td>`).join('')}</tr><tr><th scope="row">Year 2 cost</th>${Y2.map(v => `<td class="r num">${v}</td>`).join('')}</tr><tr><th scope="row">NPV</th>${NPV.map(v => `<td class="r num">${v}</td>`).join('')}</tr></tbody>`;
+const b1S = document.getElementById('b1S'), b2S = document.getElementById('b2S');
+function upd7() {
+  const b1 = +b1S.value, b2 = +b2S.value, r = best(x => dot(Y1, x) <= b1 + 1e-9 && dot(Y2, x) <= b2 + 1e-9), x = r.ties[0];
+  document.getElementById('b1O').textContent = '$' + b1.toFixed(1) + 'm'; document.getElementById('b2O').textContent = '$' + b2.toFixed(1) + 'm';
+  document.getElementById('mpNpv').textContent = fmt(r.npv, 1);
+  document.getElementById('mpSet').textContent = setStr(x) + (r.ties.length > 1 ? ` (+${r.ties.length - 1} tie${r.ties.length > 2 ? 's' : ''})` : '');
+  document.getElementById('mpUse').textContent = `uses $${fmt(dot(Y1, x), 1)}m in year 1, $${fmt(dot(Y2, x), 1)}m in year 2`;
+}
+b1S.addEventListener('input', upd7); b2S.addEventListener('input', upd7); upd7();
+
+// Stage 8
+const RULES = [
+  { id: 'eo', on: false, title: 'Either-or', words: 'Investments 3 and 4 need the same engineering team: at most one can go ahead.', tex: 'X_3 + X_4 \\le 1', f: x => x[2] + x[3] <= 1 },
+  { id: 'it', on: false, title: 'If-then', words: 'Investment 1 builds on investment 7: it can only go ahead if 7 does.', tex: 'X_1 \\le X_7', f: x => x[0] <= x[6] },
+  { id: 'k', on: false, title: 'At most k', words: 'Management can oversee at most three new investments.', tex: '\\textstyle\\sum_{i} X_i \\le 3', f: x => x.reduce((a, b) => a + b, 0) <= 3 },
+  { id: 'al', on: false, title: 'At least one', words: 'Strategy requires at least one of investments 2 and 5.', tex: 'X_2 + X_5 \\ge 1', f: x => x[1] + x[4] >= 1 }
+];
+const LG0 = best(x => dot(COST, x) <= 19 + 1e-9).npv;
+function upd8() {
+  const rl = document.getElementById('rules');
+  rl.innerHTML = RULES.map((r, k) => `<label class="rule${r.on ? ' on' : ''}"><input type="checkbox" data-k="${k}" ${r.on ? 'checked' : ''}><span><b>${r.title}.</b> ${r.words}</span><span class="mx">\\(${r.tex}\\)</span></label>`).join('');
+  rl.querySelectorAll('input').forEach(c => c.addEventListener('change', () => { RULES[+c.dataset.k].on = c.checked; upd8(); }));
+  typeset(rl);
+  const act = RULES.filter(r => r.on), res = best(x => dot(COST, x) <= 19 + 1e-9 && act.every(r => r.f(x))), x = res.ties[0];
+  document.getElementById('lgNpv').textContent = fmt(res.npv, 1);
+  document.getElementById('lgSet').textContent = setStr(x) + (res.ties.length > 1 ? ` (+${res.ties.length - 1} tie${res.ties.length > 2 ? 's' : ''})` : '');
+  document.getElementById('lgCost').textContent = `costs $${fmt(dot(COST, x), 1)}m`;
+  document.getElementById('lgPrice').textContent = fmt(LG0 - res.npv, 1);
+}
+upd8();
+// Truth table quiz
+let quiz = null;
+function updQuiz() {
+  const rows = [[0,0],[0,1],[1,0],[1,1]];
+  document.getElementById('truth').innerHTML = '<thead><tr><th>\\(X_1\\)</th><th>\\(X_7\\)</th><th>Allowed by the rule?</th>' + (quiz ? `<th>Allowed by ${quiz === 'a' ? '\\(X_1 \\le X_7\\)' : '\\(X_7 \\le X_1\\)'}?</th>` : '') + '</tr></thead><tbody>' +
+    rows.map(([a, b]) => { const ok = !(a === 1 && b === 0), q = quiz === 'a' ? a <= b : b <= a;
+      return `<tr><td>${a}</td><td>${b}</td><td>${ok ? 'yes' : '<b>no</b>: 1 without 7'}</td>${quiz ? `<td class="${q === ok ? 'match' : 'clash'}">${q ? 'yes' : 'no'}</td>` : ''}</tr>`; }).join('') + '</tbody>';
+  typeset(document.getElementById('truth'));
+  document.getElementById('quizText').innerHTML = !quiz ? 'Select an inequality to test it against the rule.' : quiz === 'a'
+    ? '<b>Correct.</b> \\(X_1 \\le X_7\\) forbids only \\(X_1 = 1, X_7 = 0\\): investment 1 without 7. At the $19m budget this rule costs $0.3m of NPV.'
+    : '<b>Not quite.</b> \\(X_7 \\le X_1\\) forbids 7 without 1, which is a different rule, and still allows 1 without 7. At $19m it changes nothing, so a reversed constraint can look harmless while modelling the wrong rule.';
+  typeset(document.getElementById('quizText'));
+  document.querySelectorAll('[data-q]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.q === quiz)));
+}
+document.querySelectorAll('[data-q]').forEach(b => b.addEventListener('click', () => { quiz = b.dataset.q; updQuiz(); }));
+updQuiz();
+
+initNav();
+renderAllEx();
+</script>
+</body>
+</html>

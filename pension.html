@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Armco Pension Fund Model</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+
+:root {
+  /* Layout: a sticky stage bar over one column of numbered stages; presenter mode shows one stage at a time, large. */
+  --bg: #f4f5f6;
+  --surface: #ffffff;
+  --ink: #18212b;
+  --muted: #5a6570;
+  --line: #d8dde2;
+  --accent: #c9352a;      /* tomato red: plants and product flow */
+  --accent-soft: #f7e3e0;
+  --cap: #b77900;         /* semantic: arc at capacity */
+  --cap-soft: #fbefd6;
+  --display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #11161b; --surface: #192027; --ink: #e6eaee; --muted: #9ba6b1; --line: #2d3640;
+    --accent: #ff6b57; --accent-soft: #3a211e; --cap: #f0b43a; --cap-soft: #3a2f17;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #11161b; --surface: #192027; --ink: #e6eaee; --muted: #9ba6b1; --line: #2d3640;
+  --accent: #ff6b57; --accent-soft: #3a211e; --cap: #f0b43a; --cap-soft: #3a2f17;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { font-size: 16px; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--body); line-height: 1.55; }
+h1, h2, h3 { font-family: var(--display); line-height: 1.15; text-wrap: balance; margin: 0; }
+h1 { font-size: 1.35rem; font-weight: 800; letter-spacing: -0.01em; }
+h2 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.015em; }
+h3 { font-size: 1.05rem; font-weight: 700; }
+p { margin: 0; max-width: 68ch; }
+button, input { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* Top bar */
+.bar { position: sticky; top: 0; z-index: 10; background: var(--surface); border-bottom: 1px solid var(--line); }
+.bar-inner { max-width: 1180px; margin: 0 auto; padding: 10px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
+.bar h1 span { color: var(--accent); }
+.stages { display: flex; flex-wrap: wrap; gap: 4px; flex: 1 1 auto; }
+.stages button { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 3px 11px; font-size: 0.82rem; cursor: pointer; color: var(--muted); }
+.stages button:hover { color: var(--ink); border-color: var(--muted); }
+.stages button[aria-current="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.mode { display: inline-flex; border: 1px solid var(--ink); border-radius: 8px; overflow: hidden; }
+.mode button { border: 0; background: transparent; padding: 5px 13px; cursor: pointer; font-weight: 600; font-size: 0.88rem; }
+.mode button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+
+main { max-width: 1180px; margin: 0 auto; padding: 24px 20px 80px; display: flex; flex-direction: column; gap: 28px; }
+.stage { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 28px; display: flex; flex-direction: column; gap: 20px; scroll-margin-top: 90px; }
+.stage-head { display: flex; align-items: baseline; gap: 14px; }
+.stage-no { font-family: var(--mono); font-size: 0.9rem; color: var(--accent); font-weight: 500; }
+.lede { font-size: 1.08rem; color: var(--muted); }
+.cols { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.stack { display: flex; flex-direction: column; gap: 14px; }
+
+/* Study-only material */
+.note { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; display: flex; flex-direction: column; gap: 6px; }
+.note h3 { font-size: 0.95rem; }
+details.q { border: 1px dashed var(--muted); border-radius: 8px; padding: 10px 14px; }
+details.q summary { cursor: pointer; font-weight: 600; }
+details.q summary::marker { color: var(--accent); }
+details.q[open] summary { margin-bottom: 8px; }
+.tag { display: inline-block; font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); }
+
+/* Data tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.tile { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.tile .k { font-size: 0.78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+.tile .v { font-family: var(--mono); font-size: 1.35rem; font-weight: 500; }
+.tile .s { font-size: 0.85rem; color: var(--muted); }
+.tile.hot { border-color: var(--accent); }
+.tile.hot .v { color: var(--accent); }
+
+/* Network */
+.net-wrap { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow-x: auto; }
+svg.net { display: block; width: 100%; min-width: 560px; height: auto; }
+.arc { fill: none; stroke: var(--line); stroke-width: 1.6; }
+.arc.used { stroke: var(--accent); }
+.arc.cap { stroke: var(--cap); }
+.arc.hl { stroke: var(--ink); stroke-width: 4; }
+.arc.dim { opacity: 0.18; }
+.mk-faint { fill: var(--line); } .mk-used { fill: var(--accent); } .mk-cap { fill: var(--cap); } .mk-hl { fill: var(--ink); }
+.lbl rect { fill: var(--surface); stroke: currentColor; stroke-width: 1.2; }
+.lbl text { font-family: var(--mono); font-size: 15px; font-weight: 500; fill: var(--ink); }
+.lbl.used { color: var(--accent); } .lbl.cap { color: var(--cap); } .lbl.dim { opacity: 0.2; }
+.node-plant { fill: var(--accent); }
+.node-wh { fill: var(--surface); stroke: var(--ink); stroke-width: 2.5; }
+.node-cust { fill: var(--ink); }
+.node-num { font-family: var(--display); font-weight: 800; font-size: 22px; text-anchor: middle; dominant-baseline: central; }
+.node-num.on-plant { fill: #fff; } .node-num.on-wh { fill: var(--ink); } .node-num.on-cust { fill: var(--bg); }
+.cap1 { font-family: var(--body); font-size: 16px; font-weight: 600; fill: var(--ink); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.cap2 { font-family: var(--mono); font-size: 14px; fill: var(--muted); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 0.85rem; color: var(--muted); padding: 8px 14px; border-top: 1px solid var(--line); }
+.legend i { display: inline-block; width: 22px; height: 0; border-top: 4px solid; vertical-align: middle; margin-right: 6px; }
+.legend .sw { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin-right: 6px; }
+
+/* Tables */
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th, td { padding: 6px 9px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+td.r, th.r { text-align: right; }
+table.matrix td, table.matrix th { text-align: center; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+table.matrix td.has { cursor: pointer; }
+table.matrix td.has:hover, table.matrix td.has.on { background: var(--ink); color: var(--bg); }
+table.matrix td.none { color: var(--line); }
+table.matrix th[scope="row"] { color: var(--ink); }
+.grp { font-size: 0.7rem; color: var(--muted); display: block; font-family: var(--body); font-weight: 400; letter-spacing: 0; text-transform: none; }
+tr.total td { font-weight: 600; border-top: 2px solid var(--ink); border-bottom: 0; }
+code { font-family: var(--mono); font-size: 0.86em; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; overflow-wrap: anywhere; }
+
+/* Maths */
+.math { font-family: "Cambria Math", "STIX Two Math", "Times New Roman", serif; font-size: 1.12rem; }
+.math i { font-style: italic; }
+.eqs { display: flex; flex-direction: column; gap: 14px; }
+.eq { display: grid; grid-template-columns: 170px 1fr; gap: 6px 18px; align-items: baseline; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+.eq:last-child { border-bottom: 0; }
+.eq .name { font-weight: 600; font-size: 0.92rem; }
+.eq .name small { display: block; font-weight: 400; color: var(--muted); }
+.eq .body { display: flex; flex-direction: column; gap: 4px; }
+.eq .ex { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); }
+.net-term { background: var(--accent-soft); border-radius: 4px; padding: 0 4px; }
+.sigma { font-size: 1.3em; vertical-align: -0.12em; }
+
+/* Controls */
+.ctrl { display: flex; flex-direction: column; gap: 6px; border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; }
+.ctrl label { font-weight: 600; display: flex; justify-content: space-between; gap: 10px; }
+.ctrl output { font-family: var(--mono); color: var(--accent); font-weight: 500; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.ticks { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 0.75rem; color: var(--muted); }
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--ink); background: transparent; border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 0.88rem; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.chart { border: 1px solid var(--line); border-radius: 10px; background: var(--bg); }
+.chart svg { display: block; width: 100%; height: auto; }
+.ch-axis { stroke: var(--muted); stroke-width: 1; }
+.ch-grid { stroke: var(--line); stroke-width: 1; }
+.ch-line { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+.ch-area { fill: var(--accent-soft); }
+.ch-dot { fill: var(--accent); stroke: var(--surface); stroke-width: 3; }
+.ch-txt { font-family: var(--mono); font-size: 12px; fill: var(--muted); }
+.ch-ttl { font-family: var(--body); font-size: 12px; fill: var(--muted); font-weight: 600; }
+.ch-cur { font-family: var(--mono); font-size: 13px; fill: var(--ink); font-weight: 500; }
+.insights { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+.solver-box { font-family: var(--mono); font-size: 0.84rem; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+.solver-box b { font-family: var(--body); }
+
+/* Article-style formulation */
+.model { display: flex; flex-direction: column; gap: 2px; }
+.model.boxed { border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; }
+.mlabel { font-weight: 700; margin: 10px 0 2px; }
+.mlabel:first-child { margin-top: 0; }
+.mrow { display: grid; grid-template-columns: minmax(0, 1fr) 3.2em; align-items: center; gap: 8px; }
+.mx { overflow-x: auto; overflow-y: hidden; }
+.mx mjx-container[display="true"] { margin: 0.35em 0 !important; }
+.mno { text-align: right; font-variant-numeric: tabular-nums; }
+.ex { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); }
+table.notation { font-size: 0.9rem; }
+table.notation caption { caption-side: top; text-align: left; padding-bottom: 6px; font-size: 0.9rem; }
+table.notation thead th { border-top: 2px solid var(--ink); border-bottom: 1px solid var(--ink); text-transform: none; letter-spacing: 0; font-size: 0.85rem; color: var(--ink); }
+table.notation th[scope="rowgroup"] { font-weight: 400; color: var(--ink); text-transform: none; letter-spacing: 0; font-size: 0.9rem; white-space: nowrap; vertical-align: top; }
+table.notation td { border-bottom: 0; padding: 3px 9px; }
+table.notation td:last-child { font-style: italic; }
+table.notation tr.grp-start > * { border-top: 1px solid var(--line); padding-top: 8px; }
+table.notation tbody tr:last-child > * { border-bottom: 2px solid var(--ink); padding-bottom: 8px; }
+table.notation th[scope="rowgroup"] { border-bottom: 0; }
+.prose p { max-width: none; }
+#formulation > .cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.model.boxed .mx { font-size: 0.86em; }
+
+/* Worked examples under each equation */
+details.exq { margin: 0 0 8px 0; border-left: 3px solid var(--accent); background: var(--bg); border-radius: 0 8px 8px 0; }
+details.exq summary { cursor: pointer; padding: 4px 12px; font-size: 0.85rem; font-weight: 600; color: var(--accent); width: fit-content; }
+details.exq[open] summary { padding-bottom: 2px; }
+.exbody { padding: 4px 14px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 0.93rem; }
+.exbody p { max-width: none; }
+.exbody .mx { font-size: 0.92em; }
+.exbody .btns { gap: 6px; }
+.exbody .chip { font-size: 0.8rem; padding: 2px 10px; }
+.exbody select { font: inherit; font-size: 0.85rem; padding: 3px 6px; border: 1px solid var(--ink); border-radius: 6px; background: var(--surface); color: var(--ink); width: fit-content; }
+.exlbl { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+.badge { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 1px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 1px; }
+.badge.bind { background: var(--cap-soft); color: var(--cap); }
+.badge.slack { background: var(--accent-soft); color: var(--accent); }
+.exrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+
+/* Problem type stage */
+.checks { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.muted { color: var(--muted); }
+.nt { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; font-family: var(--display); font-weight: 800; font-size: 0.75rem; margin-right: 6px; vertical-align: -5px; }
+.nt-s { background: var(--accent); color: #fff; }
+.nt-t { border: 2px solid var(--ink); border-radius: 5px; color: var(--ink); }
+.nt-d { background: var(--ink); color: var(--bg); }
+table.nodetypes td:first-child { white-space: nowrap; font-weight: 600; }
+.family { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fam { margin: 0; border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 8px; background: var(--bg); }
+.fam.here { border-color: var(--accent); border-width: 2px; }
+.fam svg { width: 100%; height: auto; display: block; }
+.fam-arcs line { stroke: var(--muted); stroke-width: 1.5; }
+.fn-s { fill: var(--accent); } .fn-d { fill: var(--ink); } .fn-t { fill: var(--surface); stroke: var(--ink); stroke-width: 2; }
+.fam figcaption { font-size: 0.88rem; color: var(--muted); }
+.fam figcaption b { display: block; color: var(--ink); font-size: 0.95rem; }
+.tile .s:only-of-type { color: var(--ink); }
+@media (max-width: 560px) { .family { grid-template-columns: 1fr; } }
+
+.pager { display: none; }
+
+/* Presenter mode */
+body.presenter { font-size: 1.2rem; }
+body.presenter .study-only { display: none !important; }
+body.presenter .stage { display: none; border: 0; background: transparent; padding: 8px 0; min-height: calc(100vh - 150px); }
+body.presenter .stage.active { display: flex; }
+body.presenter main { max-width: 1400px; padding-top: 16px; }
+body.presenter h2 { font-size: 2.4rem; }
+body.presenter .lede { font-size: 1.3rem; }
+body.presenter .pager { display: flex; position: fixed; right: 20px; bottom: 18px; gap: 8px; z-index: 11; }
+body.presenter .pager button { border: 1px solid var(--ink); background: var(--surface); border-radius: 10px; padding: 8px 16px; cursor: pointer; font-weight: 600; }
+body.presenter .pager span { align-self: center; font-family: var(--mono); color: var(--muted); padding: 0 8px; }
+body.presenter .math { font-size: 1.35rem; }
+body.presenter .mx { font-size: 1.15em; }
+body:not(.presenter) .presenter-only { display: none !important; }
+
+@media (max-width: 860px) {
+  .cols { grid-template-columns: 1fr; }
+  .eq { grid-template-columns: 1fr; }
+  .stage { padding: 20px 16px; }
+  h2 { font-size: 1.45rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .arc, .lbl { transition: opacity 0.2s, stroke 0.2s; }
+}
+
+
+table.cfm th, table.cfm td { padding: 5px 6px; font-size: 0.85rem; }
+table.cfm th[scope="row"], #payTable th[scope="row"] { text-transform: none; color: var(--ink); white-space: nowrap; }
+#payTable th, #payTable td { padding: 5px 6px; font-size: 0.85rem; }
+.bar-bond { fill: var(--accent); opacity: 0.85; } .bar-carry { fill: var(--muted); opacity: 0.55; }
+.pay-line { stroke: var(--ink); stroke-width: 3; }
+.tight { font-family: var(--mono); font-size: 10px; fill: var(--cap); font-weight: 600; }
+
+
+.modnav { max-width: 1180px; margin: 0 auto 40px; padding: 16px 20px; display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; border-top: 1px solid var(--line); font-size: 0.9rem; }
+.modnav b { font-family: var(--display); margin-right: 6px; }
+.modnav a { color: var(--ink); text-decoration: none; border: 1px solid var(--line); border-radius: 999px; padding: 3px 11px; }
+.modnav a:hover { border-color: var(--ink); }
+.modnav a[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+body.presenter .modnav { display: none; }
+.here-row td { background: var(--accent-soft); }
+
+</style>
+<script>
+window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
+</script>
+<script src="assets/tex-svg.js" async></script>
+</head>
+<body>
+<header class="bar">
+  <div class="bar-inner">
+    <h1>Asset–liability matching · <span>Armco</span></h1>
+    <nav class="stages" id="stageNav" aria-label="Stages"></nav>
+    <div class="mode" role="group" aria-label="View mode">
+      <button id="modeStudy" type="button" aria-pressed="true">Study</button>
+      <button id="modePresent" type="button" aria-pressed="false">Presenter</button>
+    </div>
+  </div>
+</header>
+<main id="main">
+
+<!-- 0 -->
+<section class="stage" id="type" data-title="Problem type">
+  <div class="stage-head"><span class="stage-no">00</span><h2>Problem type: asset–liability matching</h2></div>
+  <p class="lede">An asset–liability matching model buys assets today, usually bonds, whose future cash flows will meet a schedule of payments that must be made later. It finds the cheapest set of assets that pays every bill on time, with any surplus reinvested at a safe rate.</p>
+  <div class="cols">
+    <div class="stack">
+      <h3>How to recognise one</h3>
+      <ul class="checks">
+        <li>There is a fixed schedule of <b>future payments</b> (liabilities) that cannot be missed.</li>
+        <li>Assets bought now pay <b>known amounts at known times</b>: coupons, then a maturity payment.</li>
+        <li>Cash left over in a year is <b>carried forward</b> with interest; nothing can be borrowed.</li>
+        <li>The aim is the <b>least money set aside today</b>.</li>
+      </ul>
+      <div class="note">
+        <h3>The key modelling idea: count the money set aside, not just the bonds</h3>
+        <p>The first payment is due before any bond pays out, so the fund must keep some cash back. The model needs a variable for the <b>total cash allocated</b> today: part buys bonds and the rest is held as cash for year 1.</p>
+      </div>
+    </div>
+    <div class="stack">
+      <h3>The family of models</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Model</th><th>Question</th></tr></thead>
+          <tbody>
+            <tr class="here-row"><td><b>Cash-flow matching</b> <span class="tag">This exercise</span></td><td>Cheapest bonds whose cash covers every payment</td></tr>
+            <tr><td>Investment strategy (14.6)</td><td>Most cash at the end from timed investments</td></tr>
+            <tr><td>Immunisation</td><td>Match the interest-rate sensitivity of assets and liabilities, not every cash flow</td></tr>
+            <tr><td>Insurance reserving</td><td>Assets to cover expected claims over time</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Common extension</th><th>What changes in the model</th></tr></thead>
+          <tbody>
+            <tr><td>Whole bonds only</td><td>Integer variables (stage 06)</td></tr>
+            <tr><td>Credit limits</td><td>Caps on bonds of each rating</td></tr>
+            <tr><td>Uncertain reinvestment rate</td><td>Re-solve for several rates (stage 07) or use scenarios</td></tr>
+            <tr><td>More bonds or later purchases</td><td>More variables; the same balance constraints</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="tiles">
+    <div class="tile"><span class="k">Linear</span><span class="s">Cash flows are proportional to the number of bonds, so the model is an LP and Solver's answer is the true minimum.</span></div>
+    <div class="tile"><span class="k">≥ is enough</span><span class="s">Each year's cash must be at least the payment. Surplus is allowed, but the model avoids it because it means money set aside unnecessarily.</span></div>
+    <div class="tile"><span class="k">Tight years</span><span class="s">The cash balance is usually zero just before a bond matures: that is where the money runs out.</span></div>
+    <div class="tile"><span class="k">Rates matter</span><span class="s">A higher reinvestment rate makes carried cash grow faster, so less needs to be set aside.</span></div>
+  </div>
+  <div class="stack study-only">
+    <h3>Check yourself: is it an asset–liability matching model?</h3>
+    <details class="q"><summary>A family buys savings bonds now to pay school fees each September for the next ten years.</summary><p>Yes. Fixed future payments are met from bonds bought today, with spare cash carried forward.</p></details>
+    <details class="q"><summary>Barney-Jones chooses investments to have as much cash as possible after four years.</summary><p>No. There are no fixed payments to meet; it maximises final wealth. It is the investment strategy model (14.6).</p></details>
+    <details class="q"><summary>A council sets aside money today so that a bridge repair fund can pay contractors £2m in each of the next five years.</summary><p>Yes. It is the same structure as Armco: known outgoings, assets with known cash flows, and the least money set aside.</p></details>
+  </div>
+</section>
+
+<!-- 1 -->
+<section class="stage" id="problem" data-title="Problem">
+  <div class="stage-head"><span class="stage-no">01</span><h2>Funding 15 years of pension payments at Armco</h2></div>
+  <p class="lede">Armco's pension fund must make a payment on the first day of each of the next 15 years. It buys bonds today to finance them, and cash not needed in a year earns 4%. What is the least money Armco must set aside now?</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="tbl-wrap"><table id="payTable" aria-label="Pension payments by year"></table></div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Bond</th><th class="r">Price</th><th class="r">Coupon</th><th class="r">Maturity payment</th></tr></thead>
+          <tbody>
+            <tr><td>Bond 1</td><td class="r num">$980</td><td class="r num">$60, years 2–5</td><td class="r num">$1,060 in year 6</td></tr>
+            <tr><td>Bond 2</td><td class="r num">$970</td><td class="r num">$65, years 2–11</td><td class="r num">$1,065 in year 12</td></tr>
+            <tr><td>Bond 3</td><td class="r num">$1,050</td><td class="r num">$75, years 2–14</td><td class="r num">$1,075 in year 15</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="stack">
+      <div class="tiles">
+        <div class="tile"><span class="k">Total payments</span><span class="v">$321,000</span><span class="s">over 15 years</span></div>
+        <div class="tile"><span class="k">Reinvestment rate</span><span class="v">4%</span><span class="s">on cash carried forward</span></div>
+      </div>
+      <details class="q study-only"><summary>Predict first: how will Armco pay the year 1 payment of $11,000?</summary><p>No bond pays anything in year 1; the first coupons arrive in year 2. So part of the money set aside today must be kept as cash for year 1.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section class="stage" id="cashflows" data-title="Cash flows">
+  <div class="stage-head"><span class="stage-no">02</span><h2>What each bond pays, year by year</h2></div>
+  <p class="lede">Cash received per bond. Darker cells pay more. The bottom row is what Armco must pay out.</p>
+  <div class="tbl-wrap"><table class="heat cfm" id="cfMatrix" aria-label="Cash flow per bond by year"></table></div>
+  <div class="note study-only"><h3>Reading the matrix</h3><p>Each bond pays coupons until it matures, then a large final payment. Bond 1 covers the early years and the jump at year 6, Bond 2 the middle years and the jump at year 12, and only Bond 3 reaches year 15.</p></div>
+</section>
+
+<!-- 3 -->
+<section class="stage" id="formulation" data-title="Formulation">
+  <div class="stage-head"><span class="stage-no">03</span><h2>Model formulation</h2></div>
+  <p class="lede">The model formulation uses the notation in the table. The variable \(Z\), the total cash allocated today, makes year 1 work.</p>
+  <div class="cols">
+    <div class="model">
+      <p class="mlabel">Objective function:</p>
+      <div class="mrow"><div class="mx">\[\min \; Z\]</div><span class="mno">(1)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex1"></div></details>
+      <p class="mlabel">Subject to:</p>
+      <div class="mrow"><div class="mx">\[Z - \sum_{j\in J} P_j X_j - E_1 = D_1\]</div><span class="mno">(2)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex2"></div></details>
+      <div class="mrow"><div class="mx">\[(1+r)E_{t-1} + \sum_{j\in J} C_{jt} X_j - E_t = D_t \qquad \forall t \in T,\ t \ge 2\]</div><span class="mno">(3)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex3"></div></details>
+      <div class="mrow"><div class="mx">\[Z \ge 0; \quad X_j \ge 0 \;\; \forall j \in J; \quad E_t \ge 0 \;\; \forall t \in T\]</div><span class="mno">(4)</span></div>
+      <details class="exq"><summary>Example</summary><div class="exbody" id="ex4"></div></details>
+    </div>
+    <div class="stack">
+      <div class="tbl-wrap">
+        <table class="notation" aria-label="Model notation table">
+          <caption><b>Table 1.</b> Model notation table.</caption>
+          <thead><tr><th></th><th>Notation</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><th scope="rowgroup" rowspan="2">Sets</th><td>\(J\)</td><td>Set of bonds, indexed by \(j\), \(J = \{1,2,3\}\)</td></tr>
+            <tr><td>\(T\)</td><td>Set of years, indexed by \(t\), \(T = \{1,\dots,15\}\)</td></tr>
+            <tr class="grp-start"><th scope="rowgroup" rowspan="4">Parameters</th><td>\(P_j\)</td><td>Price of bond \(j \in J\) today ($)</td></tr>
+            <tr><td>\(C_{jt}\)</td><td>Cash paid by one bond \(j \in J\) at the start of year \(t \in T\) (coupon or maturity payment)</td></tr>
+            <tr><td>\(D_t\)</td><td>Pension payment due at the start of year \(t \in T\) ($)</td></tr>
+            <tr><td>\(r\)</td><td>Interest rate earned on cash carried forward, 4%</td></tr>
+            <tr class="grp-start"><th scope="rowgroup" rowspan="3">Decision variables</th><td>\(Z\)</td><td>Total cash allocated to the fund today ($)</td></tr>
+            <tr><td>\(X_j\)</td><td>Number of bonds \(j \in J\) bought today</td></tr>
+            <tr><td>\(E_t\)</td><td>Cash left after making the payment in year \(t \in T\), carried forward at rate \(r\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="tiles">
+        <div class="tile"><span class="k">Variables</span><span class="v">19</span><span class="s">Z, 3 bonds, 15 balances</span></div>
+        <div class="tile"><span class="k">Balances</span><span class="v">15</span><span class="s">one per year</span></div>
+        <div class="tile"><span class="k">Model type</span><span class="v">LP</span><span class="s">cash-flow matching</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="prose study-only">
+    <p>The objective (1) minimises the total cash Armco must allocate today. Constraint (2) is the year 1 balance: the cash allocated pays for the bonds, makes the first payment, and anything left over is carried forward. Constraints (3) are the balances for years 2 to 15: cash carried from last year with interest, plus the coupons and maturity payments received, pays this year's pension, and the remainder is carried forward. Constraints (4) ensure that nothing is negative; in particular \(E_t \ge 0\) means every payment is made in full and on time.</p>
+  </div>
+</section>
+
+<!-- 4 -->
+<section class="stage" id="excel" data-title="Excel ↔ maths">
+  <div class="stage-head"><span class="stage-no">04</span><h2>From the spreadsheet to the maths</h2></div>
+  <p class="lede">In <i>Pension Fund Management Finished.xlsx</i> Cash_allocated is both a changing cell and the objective.</p>
+  <div class="cols">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Range name</th><th>Cells</th><th>Formula</th><th>In the maths</th></tr></thead>
+        <tbody>
+          <tr><td>Bond table</td><td class="mono">B5:P7</td><td>inputs (price in year 1 column)</td><td>\(P_j\), \(C_{jt}\)</td></tr>
+          <tr><td><b>Bonds_purchased</b></td><td class="mono">B12:B14</td><td>changing cells</td><td>\(X_j\)</td></tr>
+          <tr><td><b>Cash_allocated</b></td><td class="mono">B16</td><td>changing cell and objective</td><td>\(Z\), objective (1)</td></tr>
+          <tr><td>Cash_available, year 1</td><td class="mono">B20</td><td><code>=Cash_allocated-SUMPRODUCT(Bonds_purchased,B5:B7)</code></td><td>\(Z - \sum_j P_j X_j\)</td></tr>
+          <tr><td>Cash_available, later years</td><td class="mono">C20:P20</td><td><code>=(B20-B22)*(1+$B$9)+SUMPRODUCT(Bonds_purchased,C5:C7)</code></td><td>\((1+r)E_{t-1} + \sum_j C_{jt} X_j\)</td></tr>
+          <tr><td>Cash_required</td><td class="mono">B22:P22</td><td>inputs</td><td>\(D_t\)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="stack">
+      <div class="solver-box" aria-label="Solver settings">
+        <b>Solver settings</b>
+        <span>Set objective: Cash_allocated &nbsp;→ Min</span>
+        <span>By changing: Bonds_purchased, Cash_allocated</span>
+        <span>Subject to:</span>
+        <span>&nbsp; Cash_available &gt;= Cash_required</span>
+        <span>Make unconstrained variables non-negative ✓</span>
+        <span>Method: Simplex LP</span>
+      </div>
+      <div class="note study-only"><h3>Where is \(E_t\)?</h3><p>Excel never names it. \(E_t\) is Cash_available minus Cash_required in each column, which is why the next year's formula starts with <code>(B20-B22)</code>. The constraint Cash_available ≥ Cash_required is exactly \(E_t \ge 0\).</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section class="stage" id="solution" data-title="Optimal plan">
+  <div class="stage-head"><span class="stage-no">05</span><h2>Armco must set aside $197,768</h2></div>
+  <p class="lede">That is $123,232 less than the $321,000 of payments: coupons, maturities and 4% interest do the rest.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="chart"><svg id="cashChart5" viewBox="0 0 660 320" role="img" aria-label="Cash available against payment each year"></svg></div>
+    </div>
+    <div class="stack">
+      <div class="tbl-wrap"><table id="plan5"></table></div>
+      <div class="btns" role="group" aria-label="Highlight a story" id="story5">
+        <button class="chip" type="button" data-s="0" aria-pressed="false">Why hold $20,376 in cash?</button>
+        <button class="chip" type="button" data-s="1" aria-pressed="false">Why 28.84 of Bond 3?</button>
+        <button class="chip" type="button" data-s="2" aria-pressed="false">Which years are tight?</button>
+      </div>
+      <p id="storyText" style="font-size:0.98rem">Select a question above.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section class="stage" id="integer" data-title="Whole bonds">
+  <div class="stage-head"><span class="stage-no">06</span><h2>What if bonds must be bought whole?</h2></div>
+  <p class="lede">The LP buys fractions of a bond. Adding integer constraints, as in the "Model with Integers" sheet, costs a little more.</p>
+  <div class="btns" role="group" aria-label="Choose version" id="verPick">
+    <button class="chip" type="button" data-v="lp" aria-pressed="true">Fractional bonds (LP)</button>
+    <button class="chip" type="button" data-v="ip" aria-pressed="false">Whole bonds (integer)</button>
+  </div>
+  <div class="cols">
+    <div class="chart"><svg id="cashChart6" viewBox="0 0 660 320" role="img" aria-label="Cash available against payment, chosen version"></svg></div>
+    <div class="stack">
+      <div class="tbl-wrap"><table id="plan6"></table></div>
+      <p id="verText" style="font-size:0.98rem"></p>
+      <details class="q study-only"><summary>Why not just round the LP answer?</summary><p>Rounding 73.69, 77.21 and 28.84 to the nearest whole bonds gives 74, 77 and 29. With those bonds Armco needs $197,974.68 to meet every payment, $87 more than the integer optimum of 74, 79 and 27 ($197,887.28). Rounding gives a workable plan, but not the cheapest one.</p></details>
+      <div class="mrow"><div class="mx">\[X_j \in \mathbb{Z} \qquad \forall j \in J\]</div><span class="mno">(5)</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section class="stage" id="whatif" data-title="What if: rate">
+  <div class="stage-head"><span class="stage-no">07</span><h2>What if the reinvestment rate changes?</h2></div>
+  <p class="lede">The rate on cash carried forward, as in the SolverTable sheets. Both versions are re-solved as you drag.</p>
+  <div class="cols">
+    <div class="stack">
+      <div class="ctrl">
+        <label for="rS">Interest on cash carried forward <output id="rO" for="rS">4.0%</output></label>
+        <input type="range" id="rS" min="2" max="6" step="0.4" value="4">
+        <div class="ticks"><span>2%</span><span>4%</span><span>6%</span></div>
+      </div>
+      <div class="chart"><svg id="rChart" viewBox="0 0 560 250" role="img" aria-label="Cash allocated against interest rate"></svg></div>
+    </div>
+    <div class="stack">
+      <div class="tiles">
+        <div class="tile hot"><span class="k">Cash allocated (LP)</span><span class="v" id="lpV">197,768</span><span class="s">$</span></div>
+        <div class="tile"><span class="k">Cash allocated (whole bonds)</span><span class="v" id="ipV">197,887</span><span class="s">$</span></div>
+      </div>
+      <div class="tbl-wrap"><table id="plan7"></table></div>
+      <details class="q study-only"><summary>Why does Bond 3 stay at 28.84 for every rate?</summary><p>Year 15's payment of $31,000 can only come from Bond 3's maturity payment of $1,075 (plus any cash carried in). The cheapest way is to carry nothing into year 15, so 31,000 ÷ 1,075 = 28.84 bonds, whatever the rate.</p></details>
+    </div>
+  </div>
+</section>
+
+</main>
+<footer class="modnav" aria-label="Advanced optimisation models"><b><a class="home" href="index.html">Advanced optimisation models</a></b><a href="investment.html">14.6 Investment strategy</a><a href="pension.html" aria-current="page">14.7 Pension fund</a><a href="capital.html">14.8 Capital budgeting</a><a href="fixedcost.html">14.9 Fixed-cost models</a><a href="hubs.html">14.10 Hub location</a><a href="electricity.html">14.11 Electricity pricing</a><a href="portfolio.html">14.12 Portfolio selection</a></footer>
+<div class="pager" aria-label="Presenter navigation">
+  <button type="button" id="prevBtn">← Back</button>
+  <span id="pageNo">1 / 1</span>
+  <button type="button" id="nextBtn">Next →</button>
+</div>
+<script>
+// Two-phase dense simplex with Bland's rule. Minimise c.x subject to rows, x >= 0.
+// rows: [{a:[...], sense:'<='|'>='|'=', b:number}]
+function solveLP(c, rows) {
+  const EPS = 1e-9;
+  const n = c.length;
+  const m = rows.length;
+  const R = rows.map(r => {
+    if (r.b < 0) return { a: r.a.map(v => -v), b: -r.b, sense: r.sense === '<=' ? '>=' : r.sense === '>=' ? '<=' : '=' };
+    return { a: r.a.slice(), b: r.b, sense: r.sense };
+  });
+  let nSlack = 0, nArt = 0;
+  R.forEach(r => { if (r.sense !== '=') nSlack++; if (r.sense !== '<=') nArt++; });
+  const N = n + nSlack + nArt;
+  const T = [];
+  const basis = [];
+  let si = n, ai = n + nSlack;
+  const artCols = [];
+  R.forEach(r => {
+    const row = new Float64Array(N + 1);
+    for (let j = 0; j < n; j++) row[j] = r.a[j];
+    if (r.sense === '<=') { row[si] = 1; basis.push(si); si++; }
+    else if (r.sense === '>=') { row[si] = -1; si++; row[ai] = 1; basis.push(ai); artCols.push(ai); ai++; }
+    else { row[ai] = 1; basis.push(ai); artCols.push(ai); ai++; }
+    row[N] = r.b;
+    T.push(row);
+  });
+  const isArt = new Uint8Array(N);
+  artCols.forEach(j => isArt[j] = 1);
+
+  function pivot(pr, pc) {
+    const prow = T[pr];
+    const pv = prow[pc];
+    for (let j = 0; j <= N; j++) prow[j] /= pv;
+    for (let i = 0; i < m; i++) {
+      if (i === pr) continue;
+      const f = T[i][pc];
+      if (Math.abs(f) > EPS) { const row = T[i]; for (let j = 0; j <= N; j++) row[j] -= f * prow[j]; }
+    }
+    basis[pr] = pc;
+  }
+  function run(cost, allowed) {
+    for (let iter = 0; iter < 5000; iter++) {
+      // reduced costs
+      let enter = -1;
+      for (let j = 0; j < N; j++) {
+        if (!allowed(j)) continue;
+        let rc = cost[j];
+        for (let i = 0; i < m; i++) rc -= cost[basis[i]] * T[i][j];
+        if (rc < -EPS) { enter = j; break; } // Bland
+      }
+      if (enter < 0) return 'optimal';
+      let leave = -1, best = Infinity;
+      for (let i = 0; i < m; i++) {
+        const a = T[i][enter];
+        if (a > EPS) {
+          const r = T[i][N] / a;
+          if (r < best - EPS || (Math.abs(r - best) <= EPS && basis[i] < basis[leave])) { best = r; leave = i; }
+        }
+      }
+      if (leave < 0) return 'unbounded';
+      pivot(leave, enter);
+    }
+    return 'iterlimit';
+  }
+  // Phase 1
+  const c1 = new Float64Array(N); artCols.forEach(j => c1[j] = 1);
+  run(c1, () => true);
+  let infeas = 0;
+  for (let i = 0; i < m; i++) if (isArt[basis[i]]) infeas += T[i][N];
+  if (infeas > 1e-7) return { status: 'infeasible' };
+  // drive remaining artificials out of basis
+  for (let i = 0; i < m; i++) {
+    if (!isArt[basis[i]]) continue;
+    for (let j = 0; j < n + nSlack; j++) if (Math.abs(T[i][j]) > 1e-9) { pivot(i, j); break; }
+  }
+  // Phase 2
+  const c2 = new Float64Array(N); for (let j = 0; j < n; j++) c2[j] = c[j];
+  const st = run(c2, j => !isArt[j]);
+  if (st !== 'optimal') return { status: st };
+  const x = new Array(n).fill(0);
+  for (let i = 0; i < m; i++) if (basis[i] < n) x[basis[i]] = T[i][N];
+  let z = 0; for (let j = 0; j < n; j++) z += c[j] * x[j];
+  return { status: 'optimal', x, z };
+}
+
+
+// Branch and bound on top of solveLP. ints = indices that must be whole numbers.
+function solveMILP(c, rows, ints) {
+  let best = null, nodes = 0;
+  const stack = [[]];
+  while (stack.length && nodes < 20000) {
+    const extra = stack.pop(); nodes++;
+    const r = solveLP(c, rows.concat(extra));
+    if (r.status !== 'optimal') continue;
+    if (best && r.z >= best.z - 1e-7) continue;
+    let k = -1, worst = 1e-6;
+    for (const j of ints) { const f = Math.abs(r.x[j] - Math.round(r.x[j])); if (f > worst) { worst = f; k = j; } }
+    if (k < 0) { r.x = r.x.map((v, j) => ints.includes(j) ? Math.round(v) : v); best = r; continue; }
+    const lo = new Array(c.length).fill(0); lo[k] = 1;
+    stack.push(extra.concat([{ a: lo, sense: '>=', b: Math.ceil(r.x[k]) }]));
+    stack.push(extra.concat([{ a: lo.slice(), sense: '<=', b: Math.floor(r.x[k]) }]));
+  }
+  return best ? Object.assign(best, { nodes }) : { status: 'infeasible', nodes };
+}
+const row = (n, terms, sense, b) => { const a = new Array(n).fill(0); for (const [j, v] of terms) a[j] += v; return { a, sense, b }; };
+const SVGNS = 'http://www.w3.org/2000/svg';
+const fmt = (v, d = 1) => (Math.round(v * 10 ** d) / 10 ** d).toLocaleString('en-GB', { maximumFractionDigits: d });
+const key = a => a[0] + '-' + a[1];
+
+function el(tag, attrs, parent) {
+  const e = document.createElementNS(SVGNS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+
+const tnum = (v, d = 2) => fmt(v, d).replace(/,/g, '{,}');
+const cap1 = s => s.replace(/^./, c => c.toUpperCase());
+function typeset(elm) {
+  if (window.MathJax && MathJax.typesetPromise) { try { MathJax.typesetClear([elm]); } catch (e) {} MathJax.typesetPromise([elm]).catch(() => {}); }
+}
+function badge(lhs, rhs, sense, unit) {
+  const gap = sense === '<=' ? rhs - lhs : sense === '>=' ? lhs - rhs : 0;
+  if (Math.abs(gap) < 1e-6) return '<span class="badge bind">binding: no room to spare</span>';
+  return `<span class="badge slack">slack: ${fmt(gap)}${unit ? ' ' + unit : ''} to spare</span>`;
+}
+function chipRow(opts, sel, attr) {
+  return '<div class="btns" role="group" aria-label="Choose an example">' + opts.map(([v, label]) =>
+    `<button type="button" class="chip" ${attr}="${v}" aria-pressed="${String(sel) === String(v)}">${label}</button>`).join('') + '</div>';
+}
+// Worked examples: EX[n] = () => html; chips use data-exv, handler sets EXSEL[n]
+const EX = {}, EXSEL = {};
+function renderEx(n) {
+  const elm = document.getElementById('ex' + n); if (!elm) return;
+  elm.innerHTML = EX[n]();
+  elm.querySelectorAll('[data-exv]').forEach(b => b.addEventListener('click', () => { EXSEL[n] = b.dataset.exv; renderEx(n); }));
+  elm.querySelectorAll('select[data-exsel]').forEach(s => s.addEventListener('change', () => { EXSEL[n] = s.value; renderEx(n); }));
+  typeset(elm);
+}
+function renderAllEx() { Object.keys(EX).forEach(n => renderEx(n)); }
+// ---------- Line chart ----------
+function drawChart(svg, pts, cur, o) {
+  svg.innerHTML = '';
+  const W = 560, H = 250, L = 62, R = 18, T = 30, B = 42;
+  const xs = pts.map(p => p.x), ys = pts.filter(p => p.y != null).map(p => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs);
+  const lo0 = o.fit ? Math.min(...ys) : 0, rawStep = (Math.max(...ys) - lo0) / 4 || Math.max(...ys) / 4 || 1, mag = 10 ** Math.floor(Math.log10(rawStep));
+  const ystep = [1, 2, 2.5, 5, 10].map(m => m * mag).find(s => s >= rawStep);
+  const yMin = o.fit ? Math.floor(lo0 / ystep) * ystep : 0, yMax = Math.max(yMin + ystep, Math.ceil(Math.max(...ys) / ystep) * ystep);
+  const sx = v => L + (v - x0) / (x1 - x0) * (W - L - R);
+  const sy = v => H - B - (v - yMin) / (yMax - yMin) * (H - T - B);
+  for (let v = yMin; v <= yMax + 1e-9; v += ystep) {
+    el('line', { x1: L, x2: W - R, y1: sy(v), y2: sy(v), class: 'ch-grid' }, svg);
+    el('text', { x: L - 8, y: sy(v) + 4, 'text-anchor': 'end', class: 'ch-txt' }, svg).textContent = fmt(v, 0);
+  }
+  o.xTicks.forEach(v => {
+    el('text', { x: sx(v), y: H - B + 18, 'text-anchor': 'middle', class: 'ch-txt' }, svg).textContent = o.xFmt(v);
+  });
+  el('line', { x1: L, x2: W - R, y1: H - B, y2: H - B, class: 'ch-axis' }, svg);
+  el('text', { x: L, y: 16, class: 'ch-ttl' }, svg).textContent = o.yLabel;
+  el('text', { x: W - R, y: H - 4, 'text-anchor': 'end', class: 'ch-ttl' }, svg).textContent = o.xLabel;
+  const ok = pts.filter(p => p.y != null);
+  const line = ok.map((p, i) => (i ? 'L' : 'M') + sx(p.x).toFixed(1) + ',' + sy(p.y).toFixed(1)).join(' ');
+  el('path', { d: line + ` L${sx(ok[ok.length - 1].x)},${sy(yMin)} L${sx(ok[0].x)},${sy(yMin)} Z`, class: 'ch-area' }, svg);
+  el('path', { d: line, class: 'ch-line' }, svg);
+  const c = pts.find(p => Math.abs(p.x - cur) < 1e-9);
+  if (c && c.y != null) {
+    el('line', { x1: sx(c.x), x2: sx(c.x), y1: sy(c.y), y2: H - B, class: 'ch-grid', 'stroke-dasharray': '3 3' }, svg);
+    el('circle', { cx: sx(c.x), cy: sy(c.y), r: 6, class: 'ch-dot' }, svg);
+    const right = sx(c.x) > W - 130;
+    const yfmt = o.yFmt || (v => fmt(v, 1));
+    el('text', { x: sx(c.x) + (right ? -12 : 12), y: sy(c.y) - 10, 'text-anchor': right ? 'end' : 'start', class: 'ch-cur' }, svg).textContent = yfmt(c.y);
+  }
+}
+
+function initNav() {
+const stages = [...document.querySelectorAll('.stage')];
+const nav = document.getElementById('stageNav');
+let cur = 0;
+stages.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.textContent = `${s.querySelector('.stage-no').textContent}  ${s.dataset.title}`;
+  b.addEventListener('click', () => go(i, true));
+  nav.appendChild(b);
+});
+function presenter() { return document.body.classList.contains('presenter'); }
+function go(i, scroll) {
+  cur = Math.max(0, Math.min(stages.length - 1, i));
+  stages.forEach((s, k) => s.classList.toggle('active', k === cur));
+  [...nav.children].forEach((b, k) => b.setAttribute('aria-current', k === cur ? 'true' : 'false'));
+  document.getElementById('pageNo').textContent = `${cur + 1} / ${stages.length}`;
+  if (presenter()) window.scrollTo(0, 0);
+  else if (scroll) stages[cur].scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+}
+function setMode(m) {
+  document.body.classList.toggle('presenter', m === 'presenter');
+  document.getElementById('modeStudy').setAttribute('aria-pressed', m === 'study');
+  document.getElementById('modePresent').setAttribute('aria-pressed', m === 'presenter');
+  try { localStorage.setItem('om-mode', m); } catch (e) {}
+  go(cur, m === 'study');
+}
+document.getElementById('modeStudy').addEventListener('click', () => setMode('study'));
+document.getElementById('modePresent').addEventListener('click', () => setMode('presenter'));
+document.getElementById('prevBtn').addEventListener('click', () => go(cur - 1));
+document.getElementById('nextBtn').addEventListener('click', () => go(cur + 1));
+document.addEventListener('keydown', e => {
+  if (!presenter() || e.target.tagName === 'INPUT') return;
+  if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); go(cur + 1); }
+  if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); go(cur - 1); }
+});
+if ('IntersectionObserver' in window) {
+  const io = new IntersectionObserver(es => {
+    if (presenter()) return;
+    es.forEach(e => { if (e.isIntersecting) { cur = stages.indexOf(e.target); [...nav.children].forEach((b, k) => b.setAttribute('aria-current', k === cur ? 'true' : 'false')); } });
+  }, { rootMargin: '-40% 0px -55% 0px' });
+  stages.forEach(s => io.observe(s));
+}
+let saved = 'study';
+try { saved = localStorage.getItem('om-mode') || 'study'; } catch (e) {}
+setMode(saved);
+go(0, false);
+}
+
+// ---------- Small convex QP solver (face enumeration) ----------
+// min 0.5 x'Qx + c'x  s.t. Aeq x = beq, Ain x <= bin. Enumerates active sets; fine for a handful of constraints.
+function linsolve(M, v) {
+  const n = v.length, A = M.map((r, i) => r.concat([v[i]]));
+  for (let k = 0; k < n; k++) {
+    let p = k; for (let i = k + 1; i < n; i++) if (Math.abs(A[i][k]) > Math.abs(A[p][k])) p = i;
+    if (Math.abs(A[p][k]) < 1e-12) return null;
+    [A[k], A[p]] = [A[p], A[k]];
+    for (let i = 0; i < n; i++) if (i !== k) { const f = A[i][k] / A[k][k]; for (let j = k; j <= n; j++) A[i][j] -= f * A[k][j]; }
+  }
+  return A.map((r, i) => r[n] / r[i]);
+}
+function solveQP(Q, c, Aeq, beq, Ain, bin) {
+  const n = c.length, m = Ain.length;
+  let best = null;
+  for (let mask = 0; mask < (1 << m); mask++) {
+    const E = Aeq.slice(), e = beq.slice();
+    for (let k = 0; k < m; k++) if (mask & (1 << k)) { E.push(Ain[k]); e.push(bin[k]); }
+    const q = E.length, N = n + q;
+    if (q > n) continue;
+    const M = [], v = [];
+    for (let i = 0; i < n; i++) { const r = Q[i].slice(); for (let k = 0; k < q; k++) r.push(E[k][i]); M.push(r); v.push(-c[i]); }
+    for (let k = 0; k < q; k++) { M.push(E[k].concat(new Array(q).fill(0))); v.push(e[k]); }
+    const s = linsolve(M, v); if (!s) continue;
+    const x = s.slice(0, n);
+    if (!Ain.every((a, k) => a.reduce((t, aj, j) => t + aj * x[j], 0) <= bin[k] + 1e-7)) continue;
+    let f = 0; for (let i = 0; i < n; i++) { f += c[i] * x[i]; for (let j = 0; j < n; j++) f += 0.5 * x[i] * Q[i][j] * x[j]; }
+    if (!best || f < best.z - 1e-12) best = { status: 'optimal', x, z: f };
+  }
+  return best || { status: 'infeasible' };
+}
+
+
+const D = [11000,12000,14000,15000,16000,18000,20000,21000,22000,24000,25000,30000,31000,31000,31000];
+const PRICE = [980, 970, 1050];
+const CF = [[0,60,60,60,60,1060,0,0,0,0,0,0,0,0,0],[0,65,65,65,65,65,65,65,65,65,65,1065,0,0,0],[0,75,75,75,75,75,75,75,75,75,75,75,75,75,1075]];
+// vars: X1 X2 X3 Z E1..E15
+function solveP(r = 0.04, integer = false) {
+  const n = 19, c = new Array(n).fill(0); c[3] = 1;
+  const rows = [];
+  for (let t = 0; t < 15; t++) {
+    const a = new Array(n).fill(0);
+    if (t === 0) { a[3] = 1; a[0] = -PRICE[0]; a[1] = -PRICE[1]; a[2] = -PRICE[2]; }
+    else { a[4 + t - 1] = 1 + r; for (let j = 0; j < 3; j++) a[j] = CF[j][t]; }
+    a[4 + t] = -1;
+    rows.push({ a, sense: '=', b: D[t] });
+  }
+  const s = integer ? solveMILP(c, rows, [0, 1, 2]) : solveLP(c, rows);
+  s.X = s.x.slice(0, 3); s.Z = s.x[3]; s.E = s.x.slice(4); s.r = r;
+  s.avail = D.map((d, t) => d + s.E[t]);
+  return s;
+}
+const LP = solveP(), IP = solveP(0.04, true);
+const money = v => '$' + fmt(v, 0);
+
+// Stage 1
+document.getElementById('payTable').innerHTML = '<thead><tr><th>Year</th>' + D.map((_, t) => `<th class="r">${t + 1}</th>`).join('') + '</tr></thead><tbody><tr><th scope="row">Payment ($000)</th>' + D.map(d => `<td class="r num">${d / 1000}</td>`).join('') + '</tr></tbody>';
+// Stage 2
+(function () {
+  let h = '<thead><tr><th>$ per bond</th>' + D.map((_, t) => `<th class="r">Y${t + 1}</th>`).join('') + '</tr></thead><tbody>';
+  CF.forEach((r, j) => { h += `<tr><th scope="row">Bond ${j + 1}</th>` + r.map(v => { const pct = v === 0 ? 0 : v > 500 ? 85 : 25; return `<td class="r num" style="background:color-mix(in srgb, var(--accent) ${pct}%, transparent);${pct > 50 ? 'color:#fff' : ''}">${v || ''}</td>`; }).join('') + '</tr>'; });
+  h += '<tr class="total"><th scope="row">Payment</th>' + D.map(d => `<td class="r num">${fmt(d, 0)}</td>`).join('') + '</tr></tbody>';
+  document.getElementById('cfMatrix').innerHTML = h;
+})();
+
+// Examples
+EXSEL[3] = '6'; EXSEL[4] = 'E5';
+EX[1] = () => `<p>The objective is a single variable: the cash allocated today. It covers the bonds and the cash kept back for year 1.</p>
+  <span class="exlbl">With the optimal plan (stage 05)</span><div class="mx">\\[Z = ${tnum(LP.Z, 2)}\\]</div>
+  <p>Of this, \\(\\sum_j P_j X_j = ${tnum(LP.Z - LP.avail[0], 2)}\\) buys bonds and \\(${tnum(LP.avail[0], 2)}\\) is kept as cash.</p>`;
+EX[2] = () => `<p>Year 1 has no bond income, so the payment must come from the cash allocated, after buying the bonds.</p>
+  <span class="exlbl">Written out</span><div class="mx">\\[Z - 980X_1 - 970X_2 - 1050X_3 - E_1 = 11{,}000\\]</div>
+  <span class="exlbl">With the optimal plan (stage 05)</span><div class="mx">\\[\\begin{aligned} & ${tnum(LP.Z, 2)} - 980(${tnum(LP.X[0], 2)}) - 970(${tnum(LP.X[1], 2)}) \\\\ & - 1050(${tnum(LP.X[2], 2)}) - ${tnum(LP.E[0], 2)} = 11{,}000 \\end{aligned}\\]</div>
+  <p>$${fmt(LP.E[0], 0)} is carried into year 2, earning 4%.</p>`;
+EX[3] = () => { const t = +EXSEL[3] - 1;
+  const terms = [0,1,2].filter(j => CF[j][t]).map(j => `${CF[j][t]}X_${j + 1}`).join(' + ');
+  const nums = [0,1,2].filter(j => CF[j][t]).map(j => `${CF[j][t]}(${tnum(LP.X[j], 2)})`).join(' + ');
+  return chipRow([2,5,6,11,12,15].map(y => [y, 'Year ' + y]), EXSEL[3], 'data-exv') +
+  `<p>For \\(t = ${t + 1}\\), only bonds with \\(C_{j${t + 1}} > 0\\) appear: ${[0,1,2].filter(j => CF[j][t]).map(j => 'Bond ' + (j + 1)).join(', ')}.</p>
+  <span class="exlbl">Written out</span><div class="mx">\\[1.04E_{${t}} + ${terms} - E_{${t + 1}} = ${tnum(D[t], 0)}\\]</div>
+  <span class="exlbl">With the optimal plan (stage 05)</span><div class="mx">\\[1.04(${tnum(LP.E[t - 1], 2)}) + ${nums} - ${tnum(LP.E[t], 2)} = ${tnum(D[t], 0)}\\]</div>
+  <p>${LP.E[t] < 1e-6 ? `Nothing is carried out of year ${t + 1}: it is a tight year.` : `$${fmt(LP.E[t], 0)} is carried forward to later years.`}</p>
+  <p class="ex">Constraint (3) creates 14 constraints, one for each of years 2 to 15.</p>`; };
+EX[4] = () => { const k = EXSEL[4], t = +k.slice(1) - 1, v = LP.E[t];
+  return chipRow([1,5,6,11,12,14,15].map(y => ['E' + y, '\\(E_{' + y + '}\\)']), EXSEL[4], 'data-exv') +
+  `<span class="exlbl">Written out</span><div class="mx">\\[E_{${t + 1}} \\ge 0\\]</div>
+  <span class="exlbl">With the optimal plan (stage 05)</span><div class="mx">\\[${tnum(v, 2)} \\ge 0\\]</div>
+  <p>${v < 1e-6 ? 'Cash runs out exactly after this payment. <span class="badge bind">binding at zero</span>' : 'Cash is left over and carried forward. <span class="badge slack">above zero</span>'}</p>
+  <p class="ex">\\(E_t \\ge 0\\) guarantees every payment is made in full. In Excel it is Cash_available &gt;= Cash_required.</p>`; };
+
+// Charts
+function drawCash(svg, s) {
+  svg.innerHTML = '';
+  const W = 660, H = 320, L = 56, Rr = 12, T = 40, Bt = 36, gw = (W - L - Rr) / 15;
+  const bondInc = D.map((_, t) => t === 0 ? 0 : [0,1,2].reduce((a, j) => a + CF[j][t] * s.X[j], 0));
+  const carried = D.map((_, t) => t === 0 ? s.Z - [0,1,2].reduce((a, j) => a + PRICE[j] * s.X[j], 0) : (1 + s.r) * s.E[t - 1]);
+  const mx = Math.max(...bondInc.map((b, t) => b + carried[t])) * 1.08, sy = v => H - Bt - v / mx * (H - T - Bt);
+  for (let v = 0; v <= mx; v += 20000) { el('line', { x1: L, x2: W - Rr, y1: sy(v), y2: sy(v), class: 'ch-grid' }, svg); el('text', { x: L - 6, y: sy(v) + 4, 'text-anchor': 'end', class: 'ch-txt' }, svg).textContent = fmt(v / 1000, 0) + 'k'; }
+  el('rect', { x: L + 110, y: 6, width: 11, height: 11, class: 'bar-bond' }, svg); el('text', { x: L + 126, y: 15, class: 'ch-txt' }, svg).textContent = 'bond income';
+  el('rect', { x: L + 220, y: 6, width: 11, height: 11, class: 'bar-carry' }, svg); el('text', { x: L + 236, y: 15, class: 'ch-txt' }, svg).textContent = 'cash carried in';
+  el('line', { x1: L + 360, x2: L + 382, y1: 11, y2: 11, class: 'pay-line' }, svg); el('text', { x: L + 388, y: 15, class: 'ch-txt' }, svg).textContent = 'payment due';
+  for (let t = 0; t < 15; t++) {
+    const x = L + t * gw + gw * 0.15, w = gw * 0.7;
+    el('rect', { x, y: sy(bondInc[t]), width: w, height: sy(0) - sy(bondInc[t]), class: 'bar-bond' }, svg);
+    el('rect', { x, y: sy(bondInc[t] + carried[t]), width: w, height: sy(bondInc[t]) - sy(bondInc[t] + carried[t]), class: 'bar-carry' }, svg);
+    el('line', { x1: x - 2, x2: x + w + 2, y1: sy(D[t]), y2: sy(D[t]), class: 'pay-line' }, svg);
+    if (s.E[t] < 1e-4) el('text', { x: x + w / 2, y: sy(D[t]) - 6, 'text-anchor': 'middle', class: 'tight' }, svg).textContent = 'tight';
+    el('text', { x: x + w / 2, y: H - Bt + 16, 'text-anchor': 'middle', class: 'ch-txt' }, svg).textContent = t + 1;
+  }
+  el('line', { x1: L, x2: W - Rr, y1: sy(0), y2: sy(0), class: 'ch-axis' }, svg);
+}
+function planTable(s, dp) {
+  return '<thead><tr><th></th><th class="r">Amount</th></tr></thead><tbody>' +
+    [0,1,2].map(j => `<tr><td>Bond ${j + 1}</td><td class="r num">${fmt(s.X[j], dp)} bonds</td></tr>`).join('') +
+    `<tr><td>Cost of bonds</td><td class="r num">${money(s.Z - s.avail[0])}</td></tr><tr><td>Cash kept for year 1</td><td class="r num">${money(s.avail[0])}</td></tr>` +
+    `<tr class="total"><td>Cash allocated today</td><td class="r num">${'$' + s.Z.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td></tr></tbody>`;
+}
+drawCash(document.getElementById('cashChart5'), LP);
+document.getElementById('plan5').innerHTML = planTable(LP, 2);
+const tight = LP.E.map((e, t) => e < 1e-4 ? t + 1 : null).filter(Boolean);
+const STORY = [
+  `No bond pays anything in year 1, yet $11,000 is due. Armco keeps $${fmt(LP.avail[0], 0)} of the money in cash: $11,000 pays year 1, and the remaining $${fmt(LP.E[0], 0)} grows at 4% to help with years 2 to 4.`,
+  'Only Bond 3 pays anything in year 15, and the cheapest plan carries no spare cash into that year. So Bond 3\'s maturity payment must cover the whole $31,000: 31,000 ÷ 1,075 = 28.84 bonds.',
+  `Cash runs out exactly in years ${tight.join(', ')}. Years 5 and 11 are the last years before Bonds 1 and 2 mature; after their large maturity payments there is spare cash again.`
+];
+document.querySelectorAll('#story5 .chip').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('#story5 .chip').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  document.getElementById('storyText').textContent = STORY[+b.dataset.s];
+}));
+
+// Stage 6
+let ver = 'lp';
+function upd6() {
+  const s = ver === 'lp' ? LP : IP;
+  drawCash(document.getElementById('cashChart6'), s);
+  document.getElementById('plan6').innerHTML = planTable(s, ver === 'lp' ? 2 : 0);
+  document.getElementById('verText').textContent = ver === 'lp'
+    ? 'Fractional bonds give the lowest possible cost, $197,768.40, but a fund cannot buy 73.69 bonds.'
+    : `Whole bonds (74, 79 and 27) cost $${fmt(IP.Z, 2)}: just $${fmt(IP.Z - LP.Z, 2)} more than the LP. The extra buys a little surplus cash in some years.`;
+  document.querySelectorAll('#verPick .chip').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.v === ver)));
+}
+document.querySelectorAll('#verPick .chip').forEach(b => b.addEventListener('click', () => { ver = b.dataset.v; upd6(); }));
+upd6();
+
+// Stage 7
+const rS = document.getElementById('rS');
+const rPts = []; for (let r = 2; r <= 6.001; r += 0.4) rPts.push({ x: +r.toFixed(1), y: solveP(r / 100).Z });
+function upd7() {
+  const r = +rS.value / 100, lp = solveP(r), ip = solveP(r, true);
+  document.getElementById('rO').textContent = (r * 100).toFixed(1) + '%';
+  document.getElementById('lpV').textContent = fmt(lp.Z, 0); document.getElementById('ipV').textContent = fmt(ip.Z, 0);
+  document.getElementById('plan7').innerHTML = '<thead><tr><th></th><th class="r">LP</th><th class="r">Whole bonds</th></tr></thead><tbody>' +
+    [0,1,2].map(j => `<tr><td>Bond ${j + 1}</td><td class="r num">${fmt(lp.X[j], 2)}</td><td class="r num">${fmt(ip.X[j], 0)}</td></tr>`).join('') + '</tbody>';
+  drawChart(document.getElementById('rChart'), rPts, +(r * 100).toFixed(1), { xLabel: 'interest on carried cash (%)', yLabel: 'Cash allocated, LP ($)', xTicks: [2, 3, 4, 5, 6], xFmt: v => v + '%', fit: true, yFmt: v => fmt(v, 0) });
+}
+rS.addEventListener('input', upd7); upd7();
+
+initNav();
+renderAllEx();
+</script>
+</body>
+</html>
