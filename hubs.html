@@ -284,7 +284,7 @@ body.presenter .modnav { display: none; }
 <script>
 window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\\]']] }, svg: { fontCache: 'global' } };
 </script>
-<script src="assets/tex-svg.js" async></script>
+<script>(function(){var s=["assets/tex-svg.js","tex-svg.js","https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js","https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.min.js"],i=0;function n(){if(i>=s.length)return;var e=document.createElement("script");e.src=s[i++];e.async=true;e.onerror=n;document.head.appendChild(e);}n();})();</script>
 </head>
 <body>
 <header class="bar">
@@ -550,12 +550,12 @@ window.MathJax = { tex: { inlineMath: [['\\(', '\\)']], displayMath: [['\\[', '\
     <div class="stack">
       <div class="solver-box" aria-label="Building it in Excel">
         <b>Building it in Excel</b>
-        <span>Add a row Covered (one cell per city): changing cells, binary</span>
-        <span>Add a Weights row and Total_covered = SUMPRODUCT(Weights, Covered)</span>
+        <span>Sheet Max_Covering in Locating Hubs Finished.xlsx</span>
+        <span>Covered: one changing cell per city; Weights beside it</span><span>Total_covered = SUMPRODUCT(Weights, Covered)</span>
         <span>Set objective: Total_covered → Max</span>
         <span>By changing: Used_as_hub, Covered</span>
         <span>&nbsp; Covered &lt;= Hubs_covered_by</span>
-        <span>&nbsp; Total_hubs &lt;= p</span>
+        <span>&nbsp; Total_hubs &lt;= Max_hubs</span>
         <span>&nbsp; Used_as_hub, Covered = binary</span>
       </div>
     </div>
